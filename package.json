@@ -1,0 +1,20 @@
+{
+  "name": "pixel-town",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "An 8-bit pixel-art town rendered on a canvas: day/night, weather, villagers, animals and screens.",
+  "scripts": {
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "smoke": "node tools/smoke.mjs"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
