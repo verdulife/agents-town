@@ -113,6 +113,27 @@ src/rng.js          seeded RNG (same seed, same town)
 tools/smoke.mjs     headless checks (see below)
 ```
 
+## Top-down v2 (work in progress)
+
+The diorama in `index.html` is v1. The next town is a fixed-framing top-down
+view, and it lives beside v1 while its proportions are being agreed:
+
+- `calibration.html` - the measuring card: buildings, an NPC in four directions,
+  a kiosk, props, the 16px grid, the guaranteed-visible rect and a ruler.
+  `?zoom=2|3|4` pins the scale for A/B comparison, `?target=320|360|400` changes
+  the height target, `?grid=0` and `?labels=0` strip the overlays.
+- `src/next/art-spec.js` - the proportion contract. Every sprite reads its sizes
+  from here, including the rule that a door is taller than a person
+  (`doorFitsNpc`), which the card checks and reports.
+- `src/next/scale.js` - the v2 scaling rule: world 720x450, 360px logical height
+  target, integer upscale, crop instead of letterbox.
+- `node tools/scale-check.mjs` - prints the density table for 12 window sizes and
+  asserts integer scale, full coverage and a view that never exceeds the world.
+
+Current numbers: tile 16px, world 720x450 (45x28 tiles), guaranteed-visible rect
+480x360 (30x22.5 tiles). 16:9 at 1080p shows 40x22.5 tiles at 3x; 16:10 at
+1440x900 shows 45x28.1 at 2x.
+
 ## Changing the town
 
 - **Layout, buildings, props, lights**: `src/world.js`. The terrain is a 28x16
