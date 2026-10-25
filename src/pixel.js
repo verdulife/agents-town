@@ -117,6 +117,40 @@ export class Painter {
     return this;
   }
 
+  // Outline that darkens each material's own colour instead of drawing black:
+  // keeps small sprites crisp without the sticker look of a hard ink border.
+  outlineSelective(amount = 0.45) {
+    const { ctx, w, h } = this;
+    const src = ctx.getImageData(0, 0, w, h);
+    const data = src.data;
+    const at = (x, y) => (y * w + x) * 4;
+    const solid = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) solid[i] = data[i * 4 + 3] > 8 ? 1 : 0;
+    const darken = (v) => Math.max(0, Math.round(v * (1 - amount)));
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (solid[i]) continue;
+        const neighbours = [
+          [x - 1, y],
+          [x, y - 1],
+          [x + 1, y],
+          [x, y + 1],
+        ].filter(([nx, ny]) => nx >= 0 && ny >= 0 && nx < w && ny < h && solid[ny * w + nx]);
+        if (!neighbours.length) continue;
+        const [nx, ny] = neighbours[0];
+        const o = at(nx, ny);
+        const d = at(x, y);
+        data[d] = darken(data[o]);
+        data[d + 1] = darken(data[o + 1]);
+        data[d + 2] = darken(data[o + 2]);
+        data[d + 3] = 255;
+      }
+    }
+    ctx.putImageData(src, 0, 0);
+    return this;
+  }
+
   blit(source, x, y) {
     const img = source.canvas || source;
     this.ctx.drawImage(img, Math.round(x), Math.round(y));

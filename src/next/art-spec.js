@@ -9,7 +9,9 @@ export const TILE = 16;
 export const SPEC = {
   tile: TILE,
 
-  npc: { w: 12, h: 20 },
+  // 1:2.1 width:height. The reference characters are 1:2.5; at 16px tiles this
+  // is as slender as the grid allows without losing the face.
+  npc: { w: 10, h: 21 },
 
   door: { w: 10, h: 22 },
   window: { w: 8, h: 9 },

@@ -165,73 +165,102 @@ export function treeTopDown(seed = 1, kind = 'oak') {
 }
 
 // ------------------------------------------------------------------ people
-// 12x20 from the contract: head 7 wide, shoulders 10, legs 3+3 with a gap.
+// 10x21 from the contract (1:2.1), modelled on the reference sheets: a big head
+// dome, narrow shoulders, legs that move horizontally, and shading instead of a
+// hard black outline so the character reads as alive next to outlined props.
 
 export function personTopDown(pal, dir = 'down', frame = 0) {
   return cacheSprite(cache, `td-person|${pal.id}|${dir}|${frame}`, () => {
     const { w, h } = SPEC.npc;
     const p = new Painter(w, h);
     const skin = pal.skin;
+    const skinDark = mix(pal.skin, C.ink, 0.28);
     const hair = pal.hair;
+    const hairDark = mix(pal.hair, C.ink, 0.35);
+    const hairLite = mix(pal.hair, C.white, 0.22);
     const shirt = pal.shirt;
-    const shirtDark = mix(pal.shirt, C.ink, 0.32);
+    const shirtDark = mix(pal.shirt, C.ink, 0.34);
+    const shirtLite = mix(pal.shirt, C.white, 0.2);
     const pants = pal.pants;
-    const step = frame % 2 === 0 ? 0 : 1;
-    const cx = w / 2;
+    const pantsDark = mix(pal.pants, C.ink, 0.35);
+    const shoe = pal.shoes || C.ink2;
+
+    // 4-frame cycle: 0 and 2 are the contact poses, 1 and 3 are the passing ones
+    const f = ((frame % 4) + 4) % 4;
+    const swing = f === 1 ? 1 : f === 3 ? -1 : 0;
 
     if (dir === 'down' || dir === 'up') {
-      p.rect(4, 1, 4, 1, hair);
-      p.rect(3, 2, 6, 2, hair);
-      p.rect(3, 4, 1, 2, hair);
-      p.rect(8, 4, 1, 2, hair);
-      if (dir === 'down') {
-        p.rect(4, 4, 4, 2, skin);
-        p.px(5, 5, C.ink);
-        p.px(7, 5, C.ink);
+      const back = dir === 'up';
+      // hair dome
+      p.rect(3, 1, 4, 1, hairLite);
+      p.rect(2, 2, 6, 1, hair);
+      p.rect(1, 3, 8, 3, hair);
+      p.hline(1, 3, 8, hairLite);
+      p.rect(1, 5, 8, 1, hairDark);
+      if (!back) {
+        // face
+        p.rect(2, 6, 6, 3, skin);
+        p.px(3, 7, C.ink);
+        p.px(6, 7, C.ink);
+        p.hline(2, 8, 6, skinDark);
       } else {
-        p.rect(4, 4, 4, 3, hair);
-        p.rect(4, 6, 4, 1, mix(hair, C.ink, 0.3));
+        p.rect(2, 6, 6, 3, hair);
+        p.hline(2, 8, 6, hairDark);
       }
-      p.rect(5, 6, 2, 1, mix(skin, C.ink, 0.2));
-      // torso
-      p.rect(2, 7, 8, 6, shirt);
-      p.rect(2, 7, 8, 1, shirtDark);
-      p.rect(1, 8, 1, 4, shirtDark);
-      p.rect(10, 8, 1, 4, shirtDark);
-      p.px(1, 12, skin);
-      p.px(10, 12, skin);
-      // legs and shoes
-      p.rect(3, 13, 3, 4 + step, pants);
-      p.rect(6, 13, 3, 5 - step, pants);
-      p.rect(3, 17 + step, 3, 2, C.ink2);
-      p.rect(6, 18 - step, 3, 2, C.ink2);
+      // neck and torso
+      p.rect(4, 9, 2, 1, skinDark);
+      p.rect(1, 10, 8, 6, shirt);
+      p.hline(1, 10, 8, shirtLite);
+      p.vline(1, 11, 4, shirtDark);
+      p.vline(8, 11, 4, shirtDark);
+      p.hline(2, 15, 6, shirtDark);
+      // arms, hands at the bottom
+      p.rect(0, 11, 1, 3, shirtDark);
+      p.rect(9, 11, 1, 3, shirtDark);
+      p.px(0, 14, skin);
+      p.px(9, 14, skin);
+      // legs: horizontal swing in the front view reads as a stride
+      const leftLift = swing > 0 ? 0 : swing < 0 ? 1 : 0;
+      const rightLift = swing > 0 ? 1 : swing < 0 ? 0 : 0;
+      p.rect(2, 16 + leftLift, 3, 4 - leftLift, pants);
+      p.rect(6, 16 + rightLift, 3, 4 - rightLift, pants);
+      p.hline(2, 19, 3, pantsDark);
+      p.hline(6, 19, 3, pantsDark);
+      p.rect(2, 20 - leftLift, 3, 1, shoe);
+      p.rect(6, 20 - rightLift, 3, 1, shoe);
     } else {
+      // profile: narrower body, one eye, one arm, legs that step forward/back
       const flip = dir === 'left';
-      p.rect(4, 1, 4, 1, hair);
-      p.rect(3, 2, 6, 3, hair);
-      p.rect(4, 5, 4, 2, skin);
-      p.px(flip ? 4 : 7, 5, C.ink);
-      p.rect(3, 7, 6, 6, shirt);
-      p.rect(3, 7, 6, 1, shirtDark);
-      p.rect(flip ? 1 : 9, 8, 2, 4, shirtDark);
-      p.px(flip ? 1 : 10, 12, skin);
-      p.rect(4, 13, 2, 5 - step, pants);
-      p.rect(6, 13, 2, 4 + step, pants);
-      p.rect(4, 18 - step, 2, 2, C.ink2);
-      p.rect(6, 17 + step, 2, 2, C.ink2);
+      p.rect(3, 1, 4, 1, hairLite);
+      p.rect(2, 2, 5, 1, hair);
+      p.rect(2, 3, 6, 3, hair);
+      p.hline(2, 3, 6, hairLite);
+      p.rect(2, 5, 6, 1, hairDark);
+      p.rect(3, 6, 5, 3, skin);
+      p.px(flip ? 3 : 6, 7, C.ink);
+      p.hline(3, 8, 5, skinDark);
+      p.rect(4, 9, 2, 1, skinDark);
+      p.rect(2, 10, 6, 6, shirt);
+      p.hline(2, 10, 6, shirtLite);
+      p.vline(2, 11, 4, shirtDark);
+      p.vline(7, 11, 4, shirtDark);
+      p.hline(3, 15, 4, shirtDark);
+      // the visible arm swings with the stride
+      const armX = flip ? 2 - swing : 7 + swing;
+      p.rect(armX, 11, 1, 3, shirtDark);
+      p.px(armX, 14, skin);
+      // legs: front and back, offset horizontally
+      const front = flip ? 3 - swing : 5 + swing;
+      const backX = flip ? 5 + swing : 3 - swing;
+      p.rect(backX, 16, 2, 4, pantsDark);
+      p.rect(front, 16, 2, 4, pants);
+      p.rect(backX, 20, 2, 1, shoe);
+      p.rect(front, 20, 2, 1, shoe);
     }
-    p.outline(C.ink);
-    const spr = p.sprite();
-    if (dir === 'left') {
-      const m = new Painter(spr.w, spr.h);
-      m.ctx.save();
-      m.ctx.translate(spr.w, 0);
-      m.ctx.scale(-1, 1);
-      m.ctx.drawImage(spr.canvas, 0, 0);
-      m.ctx.restore();
-      return m.sprite();
-    }
-    return spr;
+    // a selective outline: darkens the silhouette's own colours instead of
+    // drawing a black border, which keeps a 10px-wide figure crisp
+    p.outlineSelective(0.42);
+    return p.sprite();
   });
 }
 
