@@ -1,0 +1,66 @@
+[
+  {
+    "file": "G3hGUH.png",
+    "size": "634x729",
+    "colors": 89,
+    "kind": "scene",
+    "pieces": 9,
+    "folder": "_split/G3hGUH"
+  },
+  {
+    "file": "GHE4Qd.png",
+    "size": "1045x855",
+    "colors": 92,
+    "kind": "scene",
+    "pieces": 9,
+    "folder": "_split/GHE4Qd"
+  },
+  {
+    "file": "HEykPU.png",
+    "size": "792x792",
+    "colors": 86,
+    "kind": "scene",
+    "pieces": 9,
+    "folder": "_split/HEykPU"
+  },
+  {
+    "file": "KAJHUP.png",
+    "size": "665x728",
+    "colors": 92,
+    "kind": "scene",
+    "pieces": 9,
+    "folder": "_split/KAJHUP"
+  },
+  {
+    "file": "SNROZF.png",
+    "size": "686x1263",
+    "colors": 72894,
+    "kind": "sheet",
+    "pieces": 145,
+    "folder": "_split/SNROZF"
+  },
+  {
+    "file": "X8ZY9k.png",
+    "size": "1543x1307",
+    "colors": 69115,
+    "kind": "sheet",
+    "pieces": 288,
+    "folder": "_split/X8ZY9k"
+  },
+  {
+    "file": "YhwpA9.png",
+    "size": "1045x855",
+    "colors": 95,
+    "kind": "scene",
+    "pieces": 9,
+    "folder": "_split/YhwpA9"
+  },
+  {
+    "file": "iQmkjz.png",
+    "size": "1717x1092",
+    "colors": 122144,
+    "kind": "sheet",
+    "pieces": 93,
+    "folder": "_split/iQmkjz"
+  }
+]
