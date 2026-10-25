@@ -176,6 +176,7 @@ function runFrames(n, stepMs = 16.7) {
 console.log('pixel-town smoke test\n');
 
 import { createWorld } from '../src/world.js';
+import { fitFont, layoutText, lineWidth } from '../src/font.js';
 
 await import('../src/main.js');
 const town = globalThis.window.__town;
@@ -198,6 +199,37 @@ check('bootstrap creates a populated world', () => {
     assert(p.inner && p.inner.w > 8 && p.inner.h > 8, `${p.kind} panel has no usable inner rect`);
   }
 });
+
+check('every panel message fits its inner rect', () => {
+  for (const panel of world.panels) {
+    assert(panel.font === 'big' || panel.font === 'tiny', `${panel.kind} has no font`);
+    for (const msg of panel.msgs) {
+      const layout = layoutText(msg, panel.inner, { font: panel.font });
+      assert(
+        layout.totalH <= panel.inner.h,
+        `"${msg}" needs ${layout.totalH}px of height, the ${panel.kind} has ${panel.inner.h}px`,
+      );
+      for (const line of layout.lines) {
+        const w = lineWidth(line, { font: layout.font });
+        assert(w <= panel.inner.w, `"${msg}" line "${line}" needs ${w}px, the ${panel.kind} has ${panel.inner.w}px`);
+      }
+    }
+  }
+});
+
+check('an over-long message is wrapped and clipped instead of spilling', () => {
+  const rect = { w: 48, h: 22 };
+  const long = 'THIS MESSAGE IS FAR LONGER THAN ANYTHING REALISTIC ON A BILLBOARD';
+  const font = fitFont([long], rect);
+  const layout = layoutText(long, rect, { font });
+  assert(layout.totalH <= rect.h, `height ${layout.totalH} exceeds ${rect.h}`);
+  for (const line of layout.lines) {
+    const w = lineWidth(line, { font: layout.font });
+    assert(w <= rect.w, `line "${line}" needs ${w}px of ${rect.w}px`);
+  }
+  assert(layout.lines.length >= 2, 'the long message should wrap onto several lines');
+});
+
 
 check('static objects stay inside the world', () => {
   for (const s of world.statics) {

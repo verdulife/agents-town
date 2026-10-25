@@ -127,8 +127,11 @@ function drawSign(p, x, y, w, text, bg, fg) {
   p.rect(x, y, w, h, C.ink);
   p.rect(x + 1, y + 1, w - 2, h - 2, bg);
   p.hline(x + 1, y + 1, w - 2, mix(bg, C.white, 0.35));
-  const textW = measureText(text, 1, 1);
-  drawText(p.ctx, text, x + Math.round((w - textW) / 2), y + 3, fg);
+  // long labels fall back to the 3x5 font instead of spilling out of the board
+  const font = measureText(text) <= w - 6 ? 'big' : 'tiny';
+  const rows = font === 'big' ? 7 : 5;
+  const textW = measureText(text, { font });
+  drawText(p.ctx, text, x + Math.round((w - textW) / 2), y + Math.round((h - rows) / 2), fg, { font });
 }
 
 export function buildingSprite(spec) {
@@ -204,7 +207,7 @@ export function buildingSprite(spec) {
 
     if (spec.awning) drawAwning(p, bx + 2, bodyTop + 6, bodyW - 4, spec.awning[0], spec.awning[1]);
     if (spec.sign) {
-      const sw = Math.min(bodyW - 8, measureText(spec.sign[0], 1, 1) + 8);
+      const sw = Math.min(bodyW - 8, measureText(spec.sign[0]) + 8);
       drawSign(p, bx + Math.round((bodyW - sw) / 2), bodyTop + (spec.awning ? 14 : 5), sw, spec.sign[0], spec.sign[1], spec.sign[2]);
     }
 
@@ -553,7 +556,7 @@ export function planterSprite(seed = 1) {
 
 export function signpostSprite(text) {
   return cacheSprite(cache, `signpost|${text}`, () => {
-    const w = Math.max(18, measureText(text, 1, 1) + 8);
+    const w = Math.max(18, measureText(text) + 8);
     const p = new Painter(w, 26);
     p.rect(w / 2 - 1, 10, 3, 16, C.woodDark);
     p.rect(1, 2, w - 2, 11, C.wood);

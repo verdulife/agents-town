@@ -3,6 +3,7 @@
 // ground contact line, which is also its depth-sort key.
 
 import { C, mix } from './palette.js';
+import { fitFont } from './font.js';
 import { makeRng } from './rng.js';
 import {
   buildingSprite,
@@ -209,8 +210,10 @@ export function createWorld(seed = 7) {
   // ---- panels (billboards and the CRT kiosk)
   const addPanel = (kind, x, baseY, msgs, opts) => {
     const sprite = panelSprite(kind, opts);
-    const entry = addStatic({ kind: 'panel', x, y: baseY, sortY: baseY, sprite, panelKind: kind, msgs });
-    world.panels.push({ kind, x, y: baseY, sprite, inner: sprite.inner, msgs });
+    // one font for the whole panel, so rotating messages never change size
+    const font = fitFont(msgs, sprite.inner);
+    const entry = addStatic({ kind: 'panel', x, y: baseY, sortY: baseY, sprite, panelKind: kind, msgs, font });
+    world.panels.push({ kind, x, y: baseY, sprite, inner: sprite.inner, msgs, font });
     blockRect(Math.floor((x - 12) / TILE), Math.floor((baseY - 6) / TILE), Math.floor((x + 12) / TILE), Math.floor(baseY / TILE));
     addLight({
       x,

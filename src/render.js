@@ -5,7 +5,7 @@
 import { mkCanvas } from './pixel.js';
 import { C, rgba, mix } from './palette.js';
 import { TILE, T, GROUND_Y } from './world.js';
-import { drawText, measureText } from './font.js';
+import { drawText, lineWidth, layoutText } from './font.js';
 import { drawSky, drawLightmap, drawGlow, drawVignette } from './lighting.js';
 import { personSprite, animalSprite, shadowSprite, smokePuffSprite } from './sprites.js';
 
@@ -250,39 +250,30 @@ function drawPanelContent(ctx, panel, time) {
   const x = panel.x - panel.sprite.w / 2 + inner.x;
   const y = panel.y - panel.sprite.h + inner.y;
 
-  if (panel.kind === 'billboard') {
-    const idx = Math.floor(time / 4.5 + panel.x * 0.017) % panel.msgs.length;
-    const text = panel.msgs[idx];
-    const local = (time / 4.5 + panel.x * 0.017) % 1;
-    const fade = local > 0.9 ? (1 - local) / 0.1 : 1;
+  const drawLines = (text, color, alpha) => {
+    const layout = layoutText(text, inner, { font: panel.font });
     ctx.save();
-    ctx.globalAlpha = Math.max(0.15, fade);
-    let scale = 1;
-    let width = measureText(text, 1, 1);
-    if (width > inner.w - 2) {
-      width = measureText(text, 1, 0);
-    }
-    if (width > inner.w - 2) {
-      scale = 1;
-    }
-    const spacing = width > inner.w - 2 ? 0 : 1;
-    const tx = x + Math.round((inner.w - measureText(text, scale, spacing)) / 2);
-    drawText(ctx, text, tx, y + 4, C.lamp);
-    drawText(ctx, '.'.repeat(Math.min(inner.w, 20)), x + 2, y + inner.h - 9, rgba('#fee761', 0.5));
+    ctx.globalAlpha = alpha;
+    layout.lines.forEach((line, i) => {
+      const w = lineWidth(line, { font: layout.font });
+      drawText(ctx, line, x + Math.round((inner.w - w) / 2), y + layout.top + i * layout.lineHeight, color, { font: layout.font });
+    });
     ctx.restore();
+  };
+
+  if (panel.kind === 'billboard') {
+    const spin = time / 4.5 + panel.x * 0.017;
+    const text = panel.msgs[Math.floor(spin) % panel.msgs.length];
+    const local = spin % 1;
+    drawLines(text, C.lamp, Math.max(0.15, local > 0.9 ? (1 - local) / 0.1 : 1));
     return;
   }
 
-  // CRT kiosk: phosphor lines that rewrite themselves
+  // CRT kiosk: phosphor text over a scanline pattern
   ctx.fillStyle = C.grassDeep;
   ctx.fillRect(x, y, inner.w, inner.h);
   const line = panel.msgs[Math.floor(time / 3 + panel.x) % panel.msgs.length];
-  drawText(ctx, line.slice(0, 4), x + 1, y + 3, '#8dffb0');
-  const bar = (Math.floor(time * 3) % 4) + 1;
-  for (let i = 0; i < bar; i++) {
-    ctx.fillStyle = i === bar - 1 ? '#8dffb0' : rgba('#8dffb0', 0.5);
-    ctx.fillRect(x + 2 + i * 4, y + 12, 3, 2);
-  }
+  drawLines(line, '#8dffb0', 1);
   ctx.fillStyle = rgba('#0b1a12', 0.25);
   for (let j = 0; j < inner.h; j += 2) ctx.fillRect(x, y + j, inner.w, 1);
 }

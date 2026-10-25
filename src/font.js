@@ -1,103 +1,229 @@
-// A 5x7 bitmap font. Used for shop signs, the big billboard, the CRT kiosk
-// and any pixel text that must live inside the canvas.
+// Two bitmap fonts: a 5x7 "big" one for short labels (shop signs) and a 3x5
+// "tiny" one for dense displays (billboards, the CRT kiosk). Layout helpers pick
+// the largest font that fits a rect and wrap text, so a message can never spill
+// out of its panel again.
 
 import { Painter, cacheSprite } from './pixel.js';
 
-const ROWS = 7;
-const COLS = 5;
+const BIG_ROWS = [
+  'A:.###.|#...#|#...#|#####|#...#|#...#|#...#',
+  'B:####.|#...#|#...#|####.|#...#|#...#|####.',
+  'C:.###.|#...#|#....|#....|#....|#...#|.###.',
+  'D:####.|#...#|#...#|#...#|#...#|#...#|####.',
+  'E:#####|#....|#....|####.|#....|#....|#####',
+  'F:#####|#....|#....|####.|#....|#....|#....',
+  'G:.###.|#...#|#....|#.###|#...#|#...#|.####',
+  'H:#...#|#...#|#...#|#####|#...#|#...#|#...#',
+  'I:.###.|..#..|..#..|..#..|..#..|..#..|.###.',
+  'J:..###|...#.|...#.|...#.|...#.|#..#.|.##..',
+  'K:#...#|#..#.|#.#..|##...|#.#..|#..#.|#...#',
+  'L:#....|#....|#....|#....|#....|#....|#####',
+  'M:#...#|##.##|#.#.#|#...#|#...#|#...#|#...#',
+  'N:#...#|##..#|#.#.#|#..##|#...#|#...#|#...#',
+  'O:.###.|#...#|#...#|#...#|#...#|#...#|.###.',
+  'P:####.|#...#|#...#|####.|#....|#....|#....',
+  'Q:.###.|#...#|#...#|#...#|#.#.#|#..#.|.##.#',
+  'R:####.|#...#|#...#|####.|#.#..|#..#.|#...#',
+  'S:.####|#....|#....|.###.|....#|....#|####.',
+  'T:#####|..#..|..#..|..#..|..#..|..#..|..#..',
+  'U:#...#|#...#|#...#|#...#|#...#|#...#|.###.',
+  'V:#...#|#...#|#...#|#...#|#...#|.#.#.|..#..',
+  'W:#...#|#...#|#...#|#...#|#.#.#|##.##|#...#',
+  'X:#...#|#...#|.#.#.|..#..|.#.#.|#...#|#...#',
+  'Y:#...#|#...#|.#.#.|..#..|..#..|..#..|..#..',
+  'Z:#####|....#|...#.|..#..|.#...|#....|#####',
+  '0:.###.|#...#|#..##|#.#.#|##..#|#...#|.###.',
+  '1:..#..|.##..|..#..|..#..|..#..|..#..|.###.',
+  '2:.###.|#...#|....#|...#.|..#..|.#...|#####',
+  '3:####.|....#|....#|.###.|....#|....#|####.',
+  '4:#..#.|#..#.|#..#.|#####|...#.|...#.|...#.',
+  '5:#####|#....|####.|....#|....#|#...#|.###.',
+  '6:.###.|#....|####.|#...#|#...#|#...#|.###.',
+  '7:#####|....#|...#.|..#..|.#...|.#...|.#...',
+  '8:.###.|#...#|#...#|.###.|#...#|#...#|.###.',
+  '9:.###.|#...#|#...#|.####|....#|....#|.###.',
+  ' :.....|.....|.....|.....|.....|.....|.....',
+  '!:..#..|..#..|..#..|..#..|..#..|.....|..#..',
+  '.:.....|.....|.....|.....|.....|.....|..#..',
+  ',:.....|.....|.....|.....|.....|..#..|.#...',
+  '-:.....|.....|.....|.###.|.....|.....|.....',
+  ':.....|..#..|.....|.....|..#..|.....|.....',
+  '?:.###.|#...#|....#|...#.|..#..|.....|..#..',
+  "':..#..|..#..|.....|.....|.....|.....|.....",
+  '/:....#|....#|...#.|..#..|.#...|#....|#....',
+  '+:.....|..#..|..#..|#####|..#..|..#..|.....',
+  '=:.....|.....|#####|.....|#####|.....|.....',
+  '·:.....|.....|..#..|.....|.....|.....|.....',
+];
 
-const G = {
-  A: '.###.|#...#|#...#|#####|#...#|#...#|#...#',
-  B: '####.|#...#|#...#|####.|#...#|#...#|####.',
-  C: '.###.|#...#|#....|#....|#....|#...#|.###.',
-  D: '####.|#...#|#...#|#...#|#...#|#...#|####.',
-  E: '#####|#....|#....|####.|#....|#....|#####',
-  F: '#####|#....|#....|####.|#....|#....|#....',
-  G: '.###.|#...#|#....|#.###|#...#|#...#|.####',
-  H: '#...#|#...#|#...#|#####|#...#|#...#|#...#',
-  I: '.###.|..#..|..#..|..#..|..#..|..#..|.###.',
-  J: '..###|...#.|...#.|...#.|...#.|#..#.|.##..',
-  K: '#...#|#..#.|#.#..|##...|#.#..|#..#.|#...#',
-  L: '#....|#....|#....|#....|#....|#....|#####',
-  M: '#...#|##.##|#.#.#|#...#|#...#|#...#|#...#',
-  N: '#...#|##..#|#.#.#|#..##|#...#|#...#|#...#',
-  O: '.###.|#...#|#...#|#...#|#...#|#...#|.###.',
-  P: '####.|#...#|#...#|####.|#....|#....|#....',
-  Q: '.###.|#...#|#...#|#...#|#.#.#|#..#.|.##.#',
-  R: '####.|#...#|#...#|####.|#.#..|#..#.|#...#',
-  S: '.####|#....|#....|.###.|....#|....#|####.',
-  T: '#####|..#..|..#..|..#..|..#..|..#..|..#..',
-  U: '#...#|#...#|#...#|#...#|#...#|#...#|.###.',
-  V: '#...#|#...#|#...#|#...#|#...#|.#.#.|..#..',
-  W: '#...#|#...#|#...#|#...#|#.#.#|##.##|#...#',
-  X: '#...#|#...#|.#.#.|..#..|.#.#.|#...#|#...#',
-  Y: '#...#|#...#|.#.#.|..#..|..#..|..#..|..#..',
-  Z: '#####|....#|...#.|..#..|.#...|#....|#####',
-  0: '.###.|#...#|#..##|#.#.#|##..#|#...#|.###.',
-  1: '..#..|.##..|..#..|..#..|..#..|..#..|.###.',
-  2: '.###.|#...#|....#|...#.|..#..|.#...|#####',
-  3: '####.|....#|....#|.###.|....#|....#|####.',
-  4: '#..#.|#..#.|#..#.|#####|...#.|...#.|...#.',
-  5: '#####|#....|####.|....#|....#|#...#|.###.',
-  6: '.###.|#....|####.|#...#|#...#|#...#|.###.',
-  7: '#####|....#|...#.|..#..|.#...|.#...|.#...',
-  8: '.###.|#...#|#...#|.###.|#...#|#...#|.###.',
-  9: '.###.|#...#|#...#|.####|....#|....#|.###.',
-  ' ': '.....|.....|.....|.....|.....|.....|.....',
-  '!': '..#..|..#..|..#..|..#..|..#..|.....|..#..',
-  '.': '.....|.....|.....|.....|.....|.....|..#..',
-  ',': '.....|.....|.....|.....|.....|..#..|.#...',
-  '-': '.....|.....|.....|.###.|.....|.....|.....',
-  ':': '.....|..#..|.....|.....|..#..|.....|.....',
-  '?': '.###.|#...#|....#|...#.|..#..|.....|..#..',
-  "'": '..#..|..#..|.....|.....|.....|.....|.....',
-  '/': '....#|....#|...#.|..#..|.#...|#....|#....',
-  '+': '.....|..#..|..#..|#####|..#..|..#..|.....',
-  '*': '.....|#.#.#|.###.|#####|.###.|#.#.#|.....',
-  '>': '.#...|..#..|...#.|....#|...#.|..#..|.#...',
-  '<': '...#.|..#..|.#...|#....|.#...|..#..|...#.',
-};
+const TINY_ROWS = [
+  'A:.#.|#.#|###|#.#|#.#',
+  'B:##.|#.#|##.|#.#|##.',
+  'C:.##|#..|#..|#..|.##',
+  'D:##.|#.#|#.#|#.#|##.',
+  'E:###|#..|##.|#..|###',
+  'F:###|#..|##.|#..|#..',
+  'G:.##|#..|#.#|#.#|.##',
+  'H:#.#|#.#|###|#.#|#.#',
+  'I:###|.#.|.#.|.#.|###',
+  'J:..#|..#|..#|#.#|.#.',
+  'K:#.#|#.#|##.|#.#|#.#',
+  'L:#..|#..|#..|#..|###',
+  'M:#.#|###|###|#.#|#.#',
+  'N:#.#|##.|#.#|#.#|#.#',
+  'O:.#.|#.#|#.#|#.#|.#.',
+  'P:##.|#.#|##.|#..|#..',
+  'Q:.#.|#.#|#.#|##.|.##',
+  'R:##.|#.#|##.|#.#|#.#',
+  'S:.##|#..|.#.|..#|##.',
+  'T:###|.#.|.#.|.#.|.#.',
+  'U:#.#|#.#|#.#|#.#|###',
+  'V:#.#|#.#|#.#|#.#|.#.',
+  'W:#.#|#.#|###|###|#.#',
+  'X:#.#|#.#|.#.|#.#|#.#',
+  'Y:#.#|#.#|.#.|.#.|.#.',
+  'Z:###|..#|.#.|#..|###',
+  '0:###|#.#|#.#|#.#|###',
+  '1:.#.|##.|.#.|.#.|###',
+  '2:##.|..#|.#.|#..|###',
+  '3:##.|..#|.#.|..#|##.',
+  '4:#.#|#.#|###|..#|..#',
+  '5:###|#..|##.|..#|##.',
+  '6:.##|#..|##.|#.#|.#.',
+  '7:###|..#|.#.|.#.|.#.',
+  '8:.#.|#.#|.#.|#.#|.#.',
+  '9:.#.|#.#|.##|..#|##.',
+  ' :...|...|...|...|...',
+  '!:.#.|.#.|.#.|...|.#.',
+  '.:...|...|...|...|.#.',
+  ',:...|...|...|.#.|#..',
+  '-:...|...|###|...|...',
+  ':...|.#.|...|.#.|...',
+  '?:##.|..#|.#.|...|.#.',
+  "':.#.|.#.|...|...|...",
+  '/:..#|..#|.#.|#..|#..',
+  '+:...|.#.|###|.#.|...',
+  '=:...|###|...|###|...',
+  '·:...|...|.#.|...|...',
+];
 
-const glyphs = {};
-for (const [ch, rows] of Object.entries(G)) glyphs[ch] = rows.split('|');
-
-export function charAdvance(scale = 1, spacing = 1) {
-  return (COLS + spacing) * scale;
+function compile(rows) {
+  const glyphs = {};
+  for (const entry of rows) {
+    const [ch, bitmap] = [entry.slice(0, 1), entry.slice(2)];
+    glyphs[ch] = bitmap.split('|');
+  }
+  return glyphs;
 }
 
-export function measureText(text, scale = 1, spacing = 1) {
+export const FONTS = {
+  big: { cols: 5, rows: 7, glyphs: compile(BIG_ROWS) },
+  tiny: { cols: 3, rows: 5, glyphs: compile(TINY_ROWS) },
+};
+
+const fontOf = (name) => FONTS[name] || FONTS.big;
+const glyphOf = (font, ch) => font.glyphs[ch] || font.glyphs['?'];
+
+export function lineWidth(text, { font = 'big', scale = 1, spacing = 1 } = {}) {
+  const f = fontOf(font);
   if (!text) return 0;
-  return text.length * charAdvance(scale, spacing) - spacing * scale;
+  return text.length * (f.cols + spacing) * scale - spacing * scale;
+}
+
+export function measureText(text, opts = {}) {
+  return lineWidth(text, opts);
 }
 
 export function drawText(ctx, text, x, y, color, opts = {}) {
-  const scale = opts.scale || 1;
-  const spacing = opts.spacing === undefined ? 1 : opts.spacing;
+  const { font = 'big', scale = 1, spacing = 1 } = opts;
+  const f = fontOf(font);
   ctx.fillStyle = color;
   let cx = Math.round(x);
   const cy = Math.round(y);
   for (const ch of String(text)) {
-    const rows = glyphs[ch.toUpperCase()] || glyphs['?'];
-    for (let r = 0; r < ROWS; r++) {
-      const row = rows[r];
-      for (let c = 0; c < COLS; c++) {
+    const rows = glyphOf(f, ch.toUpperCase());
+    for (let r = 0; r < f.rows; r++) {
+      const row = rows[r] || '';
+      for (let c = 0; c < f.cols; c++) {
         if (row[c] === '#') ctx.fillRect(cx + c * scale, cy + r * scale, scale, scale);
       }
     }
-    cx += charAdvance(scale, spacing);
+    cx += (f.cols + spacing) * scale;
   }
   return cx;
+}
+
+// Greedy word wrap; splits words that are wider than the line on their own.
+export function wrapText(text, { font = 'big', maxWidth, scale = 1, spacing = 1 } = {}) {
+  const opts = { font, scale, spacing };
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = '';
+  for (let word of words) {
+    while (word.length > 1 && lineWidth(word, opts) > maxWidth) {
+      let cut = word.length - 1;
+      while (cut > 1 && lineWidth(word.slice(0, cut), opts) > maxWidth) cut--;
+      if (current) {
+        lines.push(current);
+        current = '';
+      }
+      lines.push(word.slice(0, cut));
+      word = word.slice(cut);
+    }
+    const candidate = current ? `${current} ${word}` : word;
+    if (lineWidth(candidate, opts) <= maxWidth) current = candidate;
+    else {
+      if (current) lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
+// Largest font whose wrapped layout fits the rect for every given text, so a
+// panel keeps one stable typography while its messages rotate.
+export function fitFont(texts, rect, { gap = 1, order = ['big', 'tiny'] } = {}) {
+  for (const font of order) {
+    const f = fontOf(font);
+    const fits = texts.every((text) => {
+      const lines = wrapText(text, { font, maxWidth: rect.w });
+      const totalH = lines.length * (f.rows + gap) - gap;
+      const widest = Math.max(...lines.map((line) => lineWidth(line, { font })));
+      return totalH <= rect.h && widest <= rect.w;
+    });
+    if (fits) return font;
+  }
+  return 'tiny';
+}
+
+// Wrapped, vertically centred layout for one text inside a rect.
+export function layoutText(text, rect, { font = 'big', gap = 1 } = {}) {
+  const f = fontOf(font);
+  // hard ceiling: whatever the text, the block never grows past the rect
+  const maxLines = Math.max(1, Math.floor((rect.h + gap) / (f.rows + gap)));
+  const lines = wrapText(text, { font, maxWidth: rect.w }).slice(0, maxLines);
+  const lineHeight = f.rows + gap;
+  return {
+    font,
+    lines,
+    lineHeight,
+    totalH: lines.length * lineHeight - gap,
+    top: Math.round((rect.h - (lines.length * lineHeight - gap)) / 2),
+  };
 }
 
 const textCache = new Map();
 
 // Cached text sprite, handy when the same string is drawn every frame.
-export function textSprite(text, color, scale = 1, spacing = 1) {
-  const key = `${text}|${color}|${scale}|${spacing}`;
+export function textSprite(text, color, opts = {}) {
+  const { font = 'big', scale = 1, spacing = 1 } = opts;
+  const key = `${text}|${color}|${font}|${scale}|${spacing}`;
   return cacheSprite(textCache, key, () => {
-    const w = measureText(text, scale, spacing);
-    const p = new Painter(w, ROWS * scale);
-    drawText(p.ctx, text, 0, 0, color, { scale, spacing });
+    const w = lineWidth(text, { font, scale, spacing });
+    const h = fontOf(font).rows * scale;
+    const p = new Painter(w, h);
+    drawText(p.ctx, text, 0, 0, color, { font, scale, spacing });
     return p.sprite();
   });
 }
