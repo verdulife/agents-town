@@ -127,8 +127,15 @@ view, and it lives beside v1 while its proportions are being agreed:
   (`doorFitsNpc`), which the card checks and reports.
 - `src/next/scale.js` - the v2 scaling rule: world 720x450, 360px logical height
   target, integer upscale, crop instead of letterbox.
+- `src/next/walker.js` - grid movement for a single NPC (four directions, tile
+  centres, deterministic for a seed). The card runs it live; `?sim=2.5&pause=1`
+  replays a fixed number of 1/60s steps and freezes, so a capture of the walk is
+  reproducible. Space pauses.
 - `node tools/scale-check.mjs` - prints the density table for 12 window sizes and
   asserts integer scale, full coverage and a view that never exceeds the world.
+- `node tools/walker-check.mjs` - movement invariants: never enters a blocked
+  tile, always stops on a tile centre, direction matches the movement axis, the
+  walk cycle alternates, and the same seed gives the same path.
 
 Current numbers: tile 16px, world 720x450 (45x28 tiles), guaranteed-visible rect
 480x360 (30x22.5 tiles). 16:9 at 1080p shows 40x22.5 tiles at 3x; 16:10 at

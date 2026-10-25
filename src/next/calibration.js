@@ -23,6 +23,7 @@ import {
   shadowBlob,
   TD_PALS,
 } from './topdown-sprites.js';
+import { createWalker, stepWalker, simulate, tileCenter } from './walker.js';
 import { C, rgba, mix } from '../palette.js';
 import { drawText, lineWidth } from '../font.js';
 import { makeRng } from '../rng.js';
@@ -31,6 +32,8 @@ const params = new URLSearchParams(location.search);
 const targetH = Number(params.get('target')) || TARGET_H;
 const zoom = Number(params.get('zoom')) || 0;
 const showGrid = params.get('grid') !== '0';
+const startPaused = params.get('pause') === '1';
+const simSeconds = Number(params.get('sim')) || 0;
 const showLabels = params.get('labels') !== '0';
 
 const canvas = document.getElementById('card');
@@ -94,6 +97,26 @@ function buildScene() {
 }
 
 const scene = buildScene();
+
+// Buildings block the walker. Trees and props are decorative for now.
+const blockers = scene
+  .filter((i) => i.sprite.w > 40 && !i.cable && !i.invisible)
+  .map((i) => ({
+    x0: Math.floor((i.x - i.sprite.w / 2) / TILE),
+    x1: Math.floor((i.x + i.sprite.w / 2) / TILE),
+    y0: Math.floor((i.y - i.sprite.h) / TILE),
+    y1: Math.floor(i.y / TILE),
+  }));
+
+const worldView = {
+  blocked(tx, ty) {
+    if (tx < 1 || ty < 1 || tx >= Math.floor(WORLD_W / TILE) - 1 || ty >= Math.floor(WORLD_H / TILE) - 1) return true;
+    return blockers.some((b) => tx >= b.x0 && tx <= b.x1 && ty >= b.y0 && ty <= b.y1);
+  },
+};
+
+const walker = createWalker({ x: CX - 140, y: CY + 30, seed: 4 });
+if (simSeconds > 0) simulate(walker, simSeconds, worldView);
 
 // ----------------------------------------------------------------- ground
 
@@ -206,6 +229,13 @@ function drawTemplate() {
     caption(`DOOR ${door.w}x${door.h}`, doorX + door.w / 2, baseY - door.h - 10, C.neon);
     caption(`NPC ${npc.w}x${npc.h}`, personX, baseY + 4, C.neon);
   }
+  // the four walk poses, at real scale, so the cycle can be judged
+  const stripX = doorX + door.w + 40;
+  for (let f = 0; f < 4; f++) {
+    const pose = personTopDown(TD_PALS[1], 'right', f % 2);
+    ctx.drawImage(pose.canvas, stripX + f * 14, baseY - pose.h - (f % 2));
+  }
+  if (showLabels) caption('WALK', stripX + 26, baseY + 4, C.neon);
   return doorFitsNpc();
 }
 
@@ -236,8 +266,20 @@ function draw(view) {
 
   ctx.drawImage(ground, 0, 0);
 
-  for (const item of scene) {
-    if (item.invisible) continue;
+  const drawables = scene.filter((i) => !i.invisible);
+  drawables.push({ x: walker.x, y: walker.y, walker: true });
+  drawables.sort((a, b) => a.y - b.y);
+
+  for (const item of drawables) {
+    if (item.walker) {
+      const spr = personTopDown(TD_PALS[1], walker.dir, walker.frame);
+      const blob = shadowBlob(12, 4);
+      ctx.globalAlpha = 0.8;
+      ctx.drawImage(blob.canvas, Math.round(walker.x - blob.w / 2), Math.round(walker.y - 2));
+      ctx.globalAlpha = 1;
+      ctx.drawImage(spr.canvas, Math.round(walker.x - spr.w / 2), Math.round(walker.y - spr.h + walker.bob));
+      continue;
+    }
     if (item.shadow !== false && !item.cable) {
       const blob = shadowBlob(Math.max(10, Math.round(item.sprite.w * 0.7)), 5);
       ctx.globalAlpha = 0.8;
@@ -278,25 +320,61 @@ function draw(view) {
 // ------------------------------------------------------------------- boot
 
 const panel = document.getElementById('readout');
+let paused = startPaused;
+let view = null;
+let panelTick = 0;
 
-function render() {
-  const cssW = window.innerWidth;
-  const cssH = window.innerHeight;
-  const view = computeView(cssW, cssH, targetH, zoom);
-  applyView(canvas, view, cssW, cssH);
-  const doorOk = draw(view);
+function updatePanel() {
   const cam = computeCamera(view);
-
   panel.innerHTML = [
-    `<b>window</b> ${cssW}x${cssH} · ${(cssW / cssH).toFixed(2)}:1`,
+    `<b>window</b> ${window.innerWidth}x${window.innerHeight} · ${(window.innerWidth / window.innerHeight).toFixed(2)}:1`,
     `<b>scale</b> ${view.scale}x${view.forced ? ' (forced)' : ` (target ${targetH})`}`,
     `<b>logical</b> ${view.w}x${view.h} → canvas ${view.cssW}x${view.cssH}`,
     `<b>tiles</b> ${view.tilesW.toFixed(1)} x ${view.tilesH.toFixed(1)}`,
     `<b>safe ${SAFE_W}x${SAFE_H}</b> ${view.safeFits ? 'fully visible' : 'CROPPED'}`,
     `<b>contract</b> npc ${SPEC.npc.w}x${SPEC.npc.h} · door ${SPEC.door.w}x${SPEC.door.h} · facade ${SPEC.facade}`,
-    `<b>door vs npc</b> ${doorOk ? 'ok' : 'TOO SHORT'}`,
+    `<b>door vs npc</b> ${doorFitsNpc() ? 'ok' : 'TOO SHORT'}`,
+    `<b>walker</b> tile ${walker.tx},${walker.ty} · ${walker.dir} · ${walker.state}${paused ? ' · PAUSED' : ''}`,
+    `<b>camera</b> ${cam.x},${cam.y}`,
   ].join('<br>');
 }
 
-window.addEventListener('resize', render);
-render();
+function layout() {
+  const cssW = window.innerWidth;
+  const cssH = window.innerHeight;
+  view = computeView(cssW, cssH, targetH, zoom);
+  applyView(canvas, view, cssW, cssH);
+  draw(view);
+  updatePanel();
+}
+
+const FIXED = 1 / 60;
+let last = performance.now();
+let acc = 0;
+
+function tick(now) {
+  const raw = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  if (!paused) {
+    acc += raw;
+    while (acc >= FIXED) {
+      stepWalker(walker, FIXED, worldView);
+      acc -= FIXED;
+    }
+  }
+  draw(view);
+  if (++panelTick % 10 === 0) updatePanel();
+  requestAnimationFrame(tick);
+}
+
+window.addEventListener('resize', layout);
+window.addEventListener('keydown', (ev) => {
+  if (ev.code === 'Space') {
+    ev.preventDefault();
+    paused = !paused;
+    updatePanel();
+  }
+});
+
+layout();
+requestAnimationFrame(tick);
