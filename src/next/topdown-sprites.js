@@ -6,7 +6,7 @@ import { Painter, cacheSprite } from '../pixel.js';
 import { C, mix } from '../palette.js';
 import { drawText, lineWidth } from '../font.js';
 import { makeRng } from '../rng.js';
-import { SPEC, TILE, houseGeometry } from './art-spec.js';
+import { SPEC } from './art-spec.js';
 
 const cache = new Map();
 
@@ -18,113 +18,6 @@ function disc(p, cx, cy, r, color) {
       p.px(cx + x, cy + y, color);
     }
   }
-}
-
-// --------------------------------------------------------------- houses
-
-export function houseSprite(spec = {}) {
-  const key = `td-house|${JSON.stringify(spec)}`;
-  return cacheSprite(cache, key, () => {
-    const { W, H, over, facadeH, roofH } = houseGeometry(spec);
-    const p = new Painter(W, H);
-    const wall = spec.wall || C.sand;
-    const wallLite = mix(wall, C.white, 0.3);
-    const wallDark = mix(wall, C.ink, 0.35);
-    const roof = spec.roof || C.roofRed;
-    const roofLite = mix(roof, C.white, 0.24);
-    const roofDark = mix(roof, C.ink, 0.38);
-    const ridgeY = Math.round(roofH * SPEC.house.roofRidge);
-    const ridgeW = Math.round(W * SPEC.house.ridgeWidth);
-
-    if (spec.modern) {
-      p.rect(0, 0, W, roofH, mix(roof, C.stone, 0.3));
-      for (let y = 2; y < roofH; y += 5) p.hline(0, y, W, mix(roof, C.ink, 0.1));
-      p.rect(0, 0, W, 3, roofLite);
-      p.rect(0, 0, 3, roofH, mix(roof, C.white, 0.3));
-      p.rect(W - 3, 0, 3, roofH, roofDark);
-      p.rect(0, roofH - 3, W, 3, roofDark);
-      const px0 = 6;
-      const py0 = 7;
-      p.rect(px0, py0, 18, 10, C.ink3);
-      p.rect(px0 + 1, py0 + 1, 16, 8, '#124e89');
-      for (let i = 3; i < 17; i += 4) p.vline(px0 + i, py0 + 1, 8, '#2ce8f5');
-      p.hline(px0 + 1, py0 + 4, 16, '#2ce8f5');
-      const ax = W - 24;
-      p.rect(ax, roofH - 18, 16, 11, C.stoneLite);
-      p.rect(ax + 1, roofH - 17, 14, 9, C.stone);
-      for (let i = 0; i < 7; i++) p.hline(ax + 2, roofH - 16 + i, 12, C.slate);
-      p.rect(5, roofH - 14, 5, 7, C.slate);
-      p.rect(4, roofH - 15, 7, 2, C.stoneLite);
-    } else {
-      // thin back-slope band, ridge, then a trapezoid widening to the eave
-      for (let y = 0; y < roofH; y++) {
-        const front = y >= ridgeY;
-        const t = front ? (y - ridgeY) / Math.max(1, roofH - 1 - ridgeY) : 0;
-        const rowW = Math.round(ridgeW + (W - ridgeW) * t);
-        const x0 = Math.round((W - rowW) / 2);
-        p.hline(x0, y, rowW, front ? roof : roofDark);
-        if (y % 4 === 0) p.hline(x0, y, rowW, front ? mix(roof, C.ink, 0.14) : mix(roofDark, C.ink, 0.25));
-        if (y % 4 === 2) p.hline(x0, y, rowW, front ? roofLite : mix(roofDark, roof, 0.4));
-      }
-      p.hline(Math.round((W - ridgeW) / 2), ridgeY, ridgeW, mix(roofLite, C.white, 0.45));
-      p.hline(Math.round((W - ridgeW) / 2), ridgeY + 1, ridgeW, roofLite);
-      p.rect(0, roofH - 3, W, 3, roofDark);
-      p.hline(0, roofH - 4, W, roofLite);
-      // chimney on the back band
-      const cx0 = W - 20;
-      p.rect(cx0, 2, 9, ridgeY + 6, mix(wall, C.stone, 0.35));
-      p.rect(cx0 - 1, 1, 11, 3, C.ink3);
-      p.rect(cx0 + 2, 2, 5, 1, C.ink);
-      // dormer with its own little roof
-      if (W >= 66) {
-        const dx = Math.round(W / 2) - 5;
-        p.rect(dx - 1, ridgeY + 5, 13, 3, roofDark);
-        p.rect(dx, ridgeY + 7, 11, 8, mix(wall, C.white, 0.12));
-        p.rect(dx + 2, ridgeY + 9, 7, 5, C.glass);
-        p.hline(dx + 2, ridgeY + 9, 7, C.glassLite);
-        p.rect(dx + 5, ridgeY + 9, 1, 5, C.ink);
-      }
-    }
-
-    // facade under the overhang
-    const fx = over;
-    const fw = W - over * 2;
-    p.rect(fx, roofH, fw, facadeH, wall);
-    p.hline(fx, roofH, fw, mix(wall, C.ink, 0.3));
-    p.vline(fx, roofH, facadeH, wallDark);
-    p.vline(fx + fw - 1, roofH, facadeH, wallDark);
-    p.rect(fx, H - 2, fw, 2, wallDark);
-    p.hline(fx, H - 3, fw, wallLite);
-
-    // door: from the contract, taller than an NPC
-    const { w: doorW, h: doorH } = SPEC.door;
-    const doorX = fx + Math.round((fw - doorW) / 2);
-    const doorY = H - 2 - doorH;
-    p.rect(doorX - 1, doorY - 1, doorW + 2, doorH + 1, C.ink);
-    p.rect(doorX, doorY, doorW, doorH, C.wood);
-    p.vline(doorX + 1, doorY, doorH, C.woodLite);
-    p.vline(doorX + doorW - 2, doorY, doorH, C.woodDark);
-    p.px(doorX + doorW - 3, doorY + Math.floor(doorH / 2), C.lamp);
-    p.rect(doorX - 2, H - 2, doorW + 4, 2, C.stoneLite);
-
-    // windows from the contract
-    const { w: winW, h: winH } = SPEC.window;
-    const count = spec.windows ?? 2;
-    const winY = roofH + 4;
-    for (let i = 0; i < count; i++) {
-      const spread = count > 1 ? (fw - winW - 12) / (count - 1) : 0;
-      const wx = fx + 6 + Math.round(i * spread);
-      if (Math.abs(wx + winW / 2 - (doorX + doorW / 2)) < doorW / 2 + winW / 2) continue;
-      p.rect(wx, winY, winW, winH, C.ink);
-      p.rect(wx + 1, winY + 1, winW - 2, winH - 2, C.glass);
-      p.hline(wx + 1, winY + 1, winW - 2, C.glassLite);
-      p.vline(wx + (winW >> 1), winY + 1, winH - 2, C.ink);
-      p.hline(wx - 1, winY + winH, winW + 2, C.stoneLite);
-    }
-
-    p.outline(C.ink);
-    return p.sprite();
-  });
 }
 
 // ------------------------------------------------------------------ nature

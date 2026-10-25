@@ -13,8 +13,8 @@ import {
   TARGET_H,
 } from './scale.js';
 import { SPEC, doorFitsNpc } from './art-spec.js';
+import { buildingSprite, gallerySpecs, variantFor } from './buildings.js';
 import {
-  houseSprite,
   treeTopDown,
   personTopDown,
   kioskSprite,
@@ -32,6 +32,8 @@ const params = new URLSearchParams(location.search);
 const targetH = Number(params.get('target')) || TARGET_H;
 const zoom = Number(params.get('zoom')) || 0;
 const showGrid = params.get('grid') !== '0';
+const galleryMode = params.get('gallery') === '1';
+const page = Number(params.get('page')) || 0;
 const startPaused = params.get('pause') === '1';
 const simSeconds = Number(params.get('sim')) || 0;
 const showLabels = params.get('labels') !== '0';
@@ -53,15 +55,17 @@ function buildScene() {
     return items[items.length - 1];
   };
 
-  // buildings, all from the contract (4x4 tiles unless stated)
-  add(CX - 190, CY - 110, houseSprite({ wall: C.sand, roof: C.roofRed }), { caption: '4x4' });
-  add(CX - 90, CY - 110, houseSprite({ wall: C.stoneLite, roof: C.roofBlue, windows: 2 }), { caption: '4x4 wide' });
-  add(CX + 15, CY - 110, houseSprite({ wall: C.stone, roof: C.roofSlate, modern: true, windows: 1 }), {
-    caption: 'FLAT 4x4',
-  });
-  add(CX + 115, CY - 110, houseSprite({ tilesW: 3, tilesH: 3, wall: C.brickLite, roof: C.roofGreen, windows: 1 }), {
-    caption: '3x3',
-  });
+  // three catalogue buildings, so the street shows the variety in context
+  for (const [type, seed, dx] of [
+    ['cottage', 3, -190],
+    ['shop', 5, -40],
+    ['apartment', 7, 120],
+  ]) {
+    const spec = variantFor(type, seed);
+    add(CX + dx, CY - 70, buildingSprite(spec), {
+      caption: `${type.toUpperCase()} ${spec.tilesW}x${spec.storeys}`,
+    });
+  }
 
   // four directions + a walk frame
   const dirs = ['down', 'up', 'left', 'right'];
@@ -256,7 +260,40 @@ function drawRuler() {
   caption('1 TILE = 16px', x0 + len / 2, y - 8, C.lamp);
 }
 
+function drawGallery(view) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#14161f';
+  ctx.fillRect(0, 0, view.w, view.h);
+  const specs = gallerySpecs(1);
+  const perPage = 9;
+  const cols = 3;
+  const top = 6;
+  const cellW = Math.floor(view.w / cols);
+  const cellH = Math.floor((view.h - top - 14) / 3);
+  const items = specs.slice(page * perPage, page * perPage + perPage);
+  items.forEach((spec, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const cx = col * cellW + cellW / 2;
+    const cy = top + row * cellH + cellH - 6;
+    const spr = buildingSprite(spec);
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx.fillRect(col * cellW + 6, cy + 1, cellW - 12, 1);
+    ctx.drawImage(spr.canvas, Math.round(cx - spr.w / 2), Math.round(cy - spr.h));
+    const label = `${spec.type.toUpperCase()} ${spec.tilesW}x${spec.storeys} ${spec.roofStyle}`;
+    const lw = lineWidth(label, { font: 'tiny' });
+    drawText(ctx, label, Math.round(cx - lw / 2), top + row * cellH + 2, C.stoneLite, { font: 'tiny' });
+    const dims = `${spr.w}x${spr.h}`;
+    const dw = lineWidth(dims, { font: 'tiny' });
+    drawText(ctx, dims, Math.round(cx - dw / 2), top + row * cellH + 9, C.slate, { font: 'tiny' });
+  });
+  const pages = Math.ceil(specs.length / perPage);
+  drawText(ctx, `GALLERY ${page + 1}/${pages} · ${specs.length} variants`, 8, view.h - 9, C.lamp, { font: 'tiny' });
+  return true;
+}
+
 function draw(view) {
+  if (galleryMode) return drawGallery(view);
   const cam = computeCamera(view);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = C.grassDeep;
@@ -365,6 +402,11 @@ function tick(now) {
   draw(view);
   if (++panelTick % 10 === 0) updatePanel();
   requestAnimationFrame(tick);
+}
+
+if (galleryMode) {
+  document.getElementById('readout').style.display = 'none';
+  document.getElementById('legend').style.display = 'none';
 }
 
 window.addEventListener('resize', layout);

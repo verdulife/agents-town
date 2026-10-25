@@ -136,6 +136,16 @@ view, and it lives beside v1 while its proportions are being agreed:
 - `node tools/walker-check.mjs` - movement invariants: never enters a blocked
   tile, always stops on a tile centre, direction matches the movement axis, the
   walk cycle alternates, and the same seed gives the same path.
+- `src/next/buildings.js` - parametric buildings. A building is a spec: width,
+  storeys, roof style and depth, wall and roof material, one segment row per
+  storey (wall / window / shopfront / door / balcony / sign / awning) and roof
+  props (chimney, AC, vent, skylight, tank, solar, antenna, hatch). Seven presets
+  (cottage, house, townhouse, shop, apartment, warehouse, civic) and
+  `variantFor(type, seed)` returns a deterministic variant.
+  `?gallery=1&page=0` renders nine of them per page with labels and sizes.
+- `node tools/buildings-check.mjs` - spec invariants: segment rows cover the
+  facade exactly, geometry matches the contract, every building fits the world,
+  variants are deterministic and distinct, unknown types fail loudly.
 
 Current numbers: tile 16px, world 720x450 (45x28 tiles), guaranteed-visible rect
 480x360 (30x22.5 tiles). 16:9 at 1080p shows 40x22.5 tiles at 3x; 16:10 at
