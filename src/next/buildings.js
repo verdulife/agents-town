@@ -104,13 +104,66 @@ function segShopfront(p, x, y, w, h, mat) {
   const gy = y + 6;
   const gh = h - 10;
   p.rect(x, y, w, h, mat.dark);
-  p.rect(gx, gy, gw, gh, C.glass);
-  p.dither(gx, gy, gw, gh, C.glass, C.glassLite, 3);
-  p.rect(gx + 2, gy + gh - 5, gw - 4, 4, mix(C.ink, C.glass, 0.35));
+  // the interior: shelves with goods and a counter, seen through the glass
+  p.rect(gx, gy, gw, gh, mix(C.glass, C.ink, 0.55));
+  for (let i = 0; i < gw - 4; i += 6) {
+    const col = [C.lampWarm, C.pink, C.neon, C.grassLite, C.stoneLite][i % 5];
+    p.rect(gx + 2 + i, gy + 3, 4, 4, col);
+    p.px(gx + 2 + i, gy + 3, mix(col, C.white, 0.4));
+  }
+  p.hline(gx + 1, gy + 8, gw - 2, C.woodDark);
+  p.rect(gx + 2, gy + gh - 4, gw - 4, 3, mix(C.wood, C.ink, 0.3));
+  // glass and reflections on top of it
+  p.dither(gx, gy, gw, 3, C.glass, C.glassLite, 3);
+  p.rect(gx, gy, 2, gh, mix(C.glass, C.white, 0.3));
+  p.dither(gx + gw - 3, gy + 2, 3, gh - 4, C.glass, C.glassLite, 1);
   for (let i = gx + 4; i < gx + gw - 2; i += 5) p.vline(i, gy, gh, mat.dark);
-  p.hline(gx, gy + 3, gw, mix(C.white, C.glassLite, 0.5));
+  p.hline(gx, gy, gw, mix(C.white, C.glassLite, 0.5));
   p.rect(gx - 1, gy + gh, gw + 2, 2, C.stoneLite);
   p.hline(x, y + 2, w, mat.lite);
+}
+
+function segSteps(p, x, y, w, h, mat, opts) {
+  segDoor(p, x, y, w, h, mat, opts);
+  const dw = Math.min(14, w - 6);
+  const dx = x + Math.round((w - dw) / 2);
+  p.rect(dx - 1, y + h - 4, dw + 2, 2, C.stoneLite);
+  p.rect(dx - 2, y + h - 2, dw + 4, 2, C.stone);
+  p.hline(dx - 2, y + h - 2, dw + 4, C.white);
+}
+
+function segGarage(p, x, y, w, h) {
+  const dw = w - 6;
+  const dh = h - 6;
+  const dx = x + 3;
+  const dy = y + 3;
+  p.rect(dx - 1, dy - 1, dw + 2, dh + 2, C.ink3);
+  p.rect(dx, dy, dw, dh, C.slate);
+  for (let i = 0; i < dh; i += 3) {
+    p.hline(dx, dy + i, dw, C.stone);
+    p.hline(dx, dy + i + 1, dw, mix(C.slate, C.ink, 0.35));
+  }
+  p.vline(dx + (dw >> 1), dy, dh, mix(C.slate, C.white, 0.2));
+  p.rect(dx, dy + dh, dw, 2, C.stoneLite);
+}
+
+function segArch(p, x, y, w, h) {
+  const dw = Math.min(20, w - 8);
+  const dh = h - 6;
+  const dx = x + Math.round((w - dw) / 2);
+  const dy = y + h - dh - 2;
+  p.rect(dx - 2, dy - 3, dw + 4, dh + 3, C.ink3);
+  p.rect(dx, dy, dw, dh, C.wood);
+  for (let i = 0; i < dw; i++) {
+    const t = (i - dw / 2) / (dw / 2);
+    const lift = Math.round(Math.sqrt(Math.max(0, 1 - t * t)) * 5);
+    p.vline(dx + i, dy - lift, lift, C.stoneLite);
+  }
+  p.vline(dx + 1, dy, dh, C.woodLite);
+  p.vline(dx + dw - 2, dy, dh, C.woodDark);
+  p.vline(dx + (dw >> 1), dy, dh, C.woodDark);
+  p.rect(dx - 2, dy + dh, dw + 4, 2, C.stoneLite);
+  p.hline(dx - 2, dy + dh, dw + 4, C.white);
 }
 
 function segDoor(p, x, y, w, h, mat, opts = {}) {
@@ -173,16 +226,19 @@ function paintGableRoof(p, W, roofD, roof) {
   const ridgeY = Math.round(roofD * 0.26);
   const endInset = Math.min(10, Math.round(W * 0.1));
   for (let y = 0; y < roofD; y++) {
-    const d = y < ridgeY ? (ridgeY - y) / Math.max(1, ridgeY) : (y - ridgeY) / Math.max(1, roofD - 1 - ridgeY);
-    const inset = Math.round(endInset * (1 - d));
+    // the back slope keeps the ridge width (a straight band); only the front
+    // slope widens to the eave. Tapering both made the top corners flare.
+    const inset =
+      y < ridgeY
+        ? endInset
+        : Math.round(endInset * (1 - (y - ridgeY) / Math.max(1, roofD - 1 - ridgeY)));
     const rowW = W - inset * 2;
     const front = y >= ridgeY;
     p.hline(inset, y, rowW, front ? roof.base : roof.dark);
-    if (y % 4 === 0) p.hline(inset, y, rowW, front ? mix(roof.base, C.ink, 0.14) : mix(roof.dark, C.ink, 0.25));
-    if (y % 4 === 2) p.hline(inset, y, rowW, front ? roof.lite : mix(roof.dark, roof.base, 0.45));
+    if (y % 4 === 0) p.hline(inset, y, rowW, front ? mix(roof.base, C.ink, 0.09) : mix(roof.dark, C.ink, 0.16));
+    if (y % 4 === 2) p.hline(inset, y, rowW, front ? mix(roof.base, roof.lite, 0.55) : mix(roof.dark, roof.base, 0.3));
   }
-  p.hline(endInset, ridgeY, W - endInset * 2, mix(roof.lite, C.white, 0.45));
-  p.hline(endInset, ridgeY + 1, W - endInset * 2, roof.lite);
+  p.hline(endInset, ridgeY, W - endInset * 2, mix(roof.base, C.white, 0.28));
   p.rect(0, roofD - 3, W, 3, roof.dark);
   p.hline(0, roofD - 4, W, roof.lite);
 }
@@ -348,10 +404,64 @@ export function buildingSprite(spec) {
           case 'awning':
             segAwning(p, x, floor.y, w, floor.h, seg.color);
             break;
+          case 'steps':
+            segSteps(p, x, floor.y, w, floor.h, wall, seg);
+            break;
+          case 'garage':
+            segGarage(p, x, floor.y, w, floor.h);
+            break;
+          case 'arch':
+            segArch(p, x, floor.y, w, floor.h);
+            break;
           default:
             segWall(p, x, floor.y, w, floor.h, wall);
         }
         x += sw;
+      }
+    }
+
+    // plinth and cornice: two bands that make a flat wall read as a building
+    p.rect(fx, H - 3, fw, 3, mix(wall.base, C.ink, 0.35));
+    p.hline(fx, H - 4, fw, wall.lite);
+    p.rect(fx, roofD + 1, fw, 3, mix(wall.base, C.ink, 0.22));
+    p.hline(fx, roofD + 1, fw, mix(wall.base, C.white, 0.25));
+    for (let s2 = 1; s2 < storeys; s2++) {
+      const yy = H - GROUND_H - s2 * STOREY_H;
+      p.rect(fx, yy, fw, 2, mix(wall.base, C.ink, 0.2));
+      p.hline(fx, yy, fw, mix(wall.base, C.white, 0.2));
+    }
+
+    // downspouts from the eave to the ground
+    for (const px of [fx + 2, fx + fw - 4]) {
+      p.rect(px, roofD + 4, 2, H - roofD - 8, C.slate);
+      p.vline(px, roofD + 4, H - roofD - 8, mix(C.slate, C.white, 0.2));
+      for (let yy = roofD + 8; yy < H - 8; yy += 14) p.rect(px - 1, yy, 4, 1, C.ink3);
+    }
+
+    // wall-mounted details from the seed: a pipe, an AC box or a hanging sign
+    for (const detail of spec.details || []) {
+      if (detail === 'ac') {
+        const ax = fx + fw - 18;
+        p.rect(ax, roofD + 8, 12, 8, C.stoneLite);
+        p.rect(ax + 1, roofD + 9, 10, 6, C.stone);
+        for (let i = 0; i < 4; i++) p.hline(ax + 2, roofD + 10 + i, 8, C.slate);
+      } else if (detail === 'hangingSign') {
+        // bracket, two hangers, then a bordered board: a sign, not a floating box
+        const sx = fx + 4;
+        const sy = H - GROUND_H - 20;
+        p.rect(sx, sy, 12, 2, C.ink3);
+        p.rect(sx + 1, sy - 1, 2, 1, C.slate);
+        p.rect(sx + 4, sy + 2, 1, 3, C.ink3);
+        p.rect(sx + 9, sy + 2, 1, 3, C.ink3);
+        p.rect(sx + 1, sy + 5, 12, 11, C.ink);
+        p.rect(sx + 2, sy + 6, 10, 9, C.lampWarm);
+        p.hline(sx + 2, sy + 6, 10, mix(C.lampWarm, C.white, 0.5));
+        p.rect(sx + 4, sy + 9, 6, 1, C.ink2);
+        p.rect(sx + 4, sy + 12, 4, 1, C.ink2);
+      } else if (detail === 'vent') {
+        const vx = fx + Math.round(fw / 2) - 4;
+        p.rect(vx, roofD + 7, 8, 6, C.slate);
+        for (let i = 0; i < 3; i++) p.hline(vx + 1, roofD + 8 + i * 2, 6, C.ink3);
       }
     }
 
@@ -368,26 +478,15 @@ export function buildingSprite(spec) {
 
 // Facade presets per type. Widths are in tiles and must sum to `tilesW`.
 export const BUILDING_TYPES = {
-  cottage: {
-    label: 'COTTAGE',
-    storeys: 1,
-    roofStyle: 'gable',
-    roofDepth: 30,
-    walls: ['plaster', 'timber', 'teal'],
-    roofs: ['red', 'orange', 'green'],
-    widths: [3, 4],
-    ground: (tw) => [{ kind: 'wall', tiles: 0.5 }, { kind: 'window', tiles: 1 }, { kind: 'door', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: tw - 3.5 }],
-    roofProps: ['chimney'],
-  },
   house: {
     label: 'HOUSE',
     storeys: 2,
     roofStyle: 'gable',
-    roofDepth: 32,
+    roofDepth: 24,
     walls: ['plaster', 'clay', 'stone'],
     roofs: ['red', 'blue', 'slate', 'purple'],
     widths: [4, 5],
-    ground: () => [{ kind: 'wall', tiles: 1 }, { kind: 'door', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: 1 }],
+    ground: (tw) => [{ kind: 'wall', tiles: 1 }, { kind: 'steps', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: Math.max(0.5, tw - 3) }],
     upper: (tw) => repeat([{ kind: 'window', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: 1 }], tw),
     roofProps: ['chimney', 'vent'],
   },
@@ -407,7 +506,7 @@ export const BUILDING_TYPES = {
     label: 'SHOP',
     storeys: 1,
     roofStyle: 'flat',
-    roofDepth: 30,
+    roofDepth: 22,
     walls: ['concrete', 'plaster', 'teal'],
     roofs: ['graphite', 'slate', 'red'],
     widths: [4, 5],
@@ -420,7 +519,7 @@ export const BUILDING_TYPES = {
     label: 'APARTMENT',
     storeys: 3,
     roofStyle: 'flat',
-    roofDepth: 34,
+    roofDepth: 26,
     walls: ['concrete', 'stone', 'clay'],
     roofs: ['graphite', 'slate'],
     widths: [5, 6],
@@ -432,26 +531,55 @@ export const BUILDING_TYPES = {
     label: 'WAREHOUSE',
     storeys: 1,
     roofStyle: 'shed',
-    roofDepth: 40,
+    roofDepth: 34,
     walls: ['concrete', 'stone'],
     roofs: ['slate', 'graphite', 'green'],
     widths: [6, 7],
     ground: (tw) => [{ kind: 'wall', tiles: 1 }, { kind: 'door', tiles: 2, double: true }, { kind: 'wall', tiles: tw - 3 }],
     roofProps: ['vent', 'skylight', 'skylight'],
   },
+  garage: {
+    label: 'GARAGE',
+    storeys: 1,
+    roofStyle: 'shed',
+    roofDepth: 26,
+    walls: ['concrete', 'stone'],
+    roofs: ['slate', 'graphite'],
+    widths: [3, 4],
+    ground: (tw) => [{ kind: 'wall', tiles: 0.5 }, { kind: 'garage', tiles: 2 }, { kind: 'wall', tiles: Math.max(0.5, tw - 2.5) }],
+    roofProps: ['vent'],
+  },
+  hotel: {
+    label: 'HOTEL',
+    storeys: 3,
+    roofStyle: 'flat',
+    roofDepth: 30,
+    walls: ['clay', 'stone', 'plaster'],
+    roofs: ['slate', 'graphite', 'red'],
+    widths: [3, 4],
+    ground: (tw) => [{ kind: 'door', tiles: 1 }, { kind: 'shopfront', tiles: 2 }, { kind: 'wall', tiles: Math.max(0.5, tw - 3) }],
+    upper: (tw) => repeat([{ kind: 'window', tiles: 1 }, { kind: 'balcony', tiles: 1 }, { kind: 'window', tiles: 1 }], tw),
+    sign: true,
+    roofProps: ['tank', 'ac'],
+  },
   civic: {
     label: 'CIVIC',
     storeys: 2,
     roofStyle: 'hip',
-    roofDepth: 36,
+    roofDepth: 32,
     walls: ['stone', 'concrete'],
     roofs: ['green', 'blue', 'slate'],
     widths: [7, 8],
-    ground: (tw) => [{ kind: 'wall', tiles: 1 }, { kind: 'door', tiles: 2, double: true }, { kind: 'window', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: tw - 5 }],
+    ground: (tw) => [{ kind: 'wall', tiles: 1 }, { kind: 'arch', tiles: 2 }, { kind: 'window', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: tw - 5 }],
     upper: (tw) => repeat([{ kind: 'window', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: 1 }], tw),
     roofProps: ['hatch', 'chimney'],
   },
 };
+
+// Types the calibration street shows in context. Kept here, next to the
+// catalogue, so a renamed or removed type fails in the test rather than in the
+// browser.
+export const STREET_TYPES = ['house', 'shop', 'apartment'];
 
 const SIGNS = ['CAFE', 'PAN', 'BOOKS', 'HOTEL', 'BAR', 'MARKET', 'FLORES', 'TECH', 'RAMEN', 'CINE'];
 
@@ -494,6 +622,9 @@ export function variantFor(typeName, seed = 1) {
     sign: type.sign ? pick(SIGNS) : null,
     signColor: pick(ACCENTS),
   };
+  // one or two wall-mounted details, so a plain facade still has something to read
+  const detailPool = ['ac', 'hangingSign', 'vent'];
+  spec.details = detailPool.filter(() => rng() < 0.45).slice(0, 2);
   // trim segments that would overflow the facade
   const trim = (segs) => {
     let total = 0;
@@ -512,10 +643,10 @@ export function variantFor(typeName, seed = 1) {
   return spec;
 }
 
-export function gallerySpecs(seed = 1) {
+export function gallerySpecs(seed = 1, perType = 3) {
   const out = [];
   for (const [name, type] of Object.entries(BUILDING_TYPES)) {
-    for (let i = 0; i < 2; i++) out.push(variantFor(name, seed + i * 13 + name.length));
+    for (let i = 0; i < perType; i++) out.push(variantFor(name, seed + i * 13 + name.length));
   }
   return out;
 }

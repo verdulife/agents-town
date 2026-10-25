@@ -13,7 +13,7 @@ import {
   TARGET_H,
 } from './scale.js';
 import { SPEC, doorFitsNpc } from './art-spec.js';
-import { buildingSprite, gallerySpecs, variantFor } from './buildings.js';
+import { buildingSprite, gallerySpecs, variantFor, STREET_TYPES } from './buildings.js';
 import {
   treeTopDown,
   personTopDown,
@@ -56,11 +56,12 @@ function buildScene() {
   };
 
   // three catalogue buildings, so the street shows the variety in context
-  for (const [type, seed, dx] of [
-    ['cottage', 3, -190],
-    ['shop', 5, -40],
-    ['apartment', 7, 120],
-  ]) {
+  const streetPlan = [
+    [STREET_TYPES[0], 3, -190],
+    [STREET_TYPES[1], 5, -40],
+    [STREET_TYPES[2], 7, 120],
+  ];
+  for (const [type, seed, dx] of streetPlan) {
     const spec = variantFor(type, seed);
     add(CX + dx, CY - 70, buildingSprite(spec), {
       caption: `${type.toUpperCase()} ${spec.tilesW}x${spec.storeys}`,

@@ -1,16 +1,20 @@
 // Building generator invariants. Pure spec + geometry, no canvas:
 //   node tools/buildings-check.mjs
 
+import { installCanvasStub } from './canvas-stub.mjs';
+installCanvasStub();
 import {
   BUILDING_TYPES,
   buildingGeometry,
   variantFor,
   gallerySpecs,
+  STREET_TYPES,
   GROUND_H,
   STOREY_H,
   OVERHANG,
 } from '../src/next/buildings.js';
 import { TILE } from '../src/next/art-spec.js';
+import { buildingSprite } from '../src/next/buildings.js';
 import { WORLD_W } from '../src/next/scale.js';
 
 let failures = 0;
@@ -31,7 +35,7 @@ function assert(cond, message) {
   if (!cond) throw new Error(message);
 }
 
-const KINDS = new Set(['wall', 'window', 'shopfront', 'door', 'balcony', 'sign', 'awning']);
+const KINDS = new Set(['wall', 'window', 'shopfront', 'door', 'steps', 'garage', 'arch', 'balcony', 'sign', 'awning']);
 const ROOF_STYLES = new Set(['gable', 'flat', 'shed', 'hip']);
 const types = Object.keys(BUILDING_TYPES);
 
@@ -98,12 +102,32 @@ check('different seeds give different buildings', () => {
   }
 });
 
-check('the gallery covers every type twice', () => {
+check('the gallery covers every type three times', () => {
   const specs = gallerySpecs(1);
-  assert(specs.length === types.length * 2, `gallery has ${specs.length} entries`);
+  assert(specs.length === types.length * 3, `gallery has ${specs.length} entries`);
   for (const type of types) {
     const count = specs.filter((s) => s.type === type).length;
-    assert(count === 2, `${type} appears ${count} times`);
+    assert(count === 3, `${type} appears ${count} times`);
+  }
+});
+
+check('cottage is gone and the new types exist', () => {
+  assert(!types.includes('cottage'), 'cottage should be removed');
+  for (const t of ['garage', 'hotel']) assert(types.includes(t), `${t} is missing`);
+});
+
+check('every gallery variant paints without throwing', () => {
+  for (const spec of gallerySpecs(1)) {
+    const spr = buildingSprite(spec);
+    const g = buildingGeometry(spec);
+    assert(spr.w === g.W && spr.h === g.H, `${spec.type}/${spec.seed}: sprite ${spr.w}x${spr.h} !== geometry ${g.W}x${g.H}`);
+    assert(spr.canvas.width === g.W, `${spec.type}/${spec.seed}: canvas width mismatch`);
+  }
+});
+
+check('the street card only asks for types that exist', () => {
+  for (const t of STREET_TYPES) {
+    assert(BUILDING_TYPES[t], `street card references missing type "${t}"`);
   }
 });
 
