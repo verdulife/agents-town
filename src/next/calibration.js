@@ -181,6 +181,29 @@ function bakeGround() {
 
 const ground = bakeGround();
 
+// The view can be larger than the world now (the field of view is fixed, not the
+// crop), so everything outside the town is painted with this tileable meadow
+// instead of a background colour: no letterbox bars, at any window size.
+function bakeField() {
+  const size = 64;
+  const cv = document.createElement('canvas');
+  cv.width = size;
+  cv.height = size;
+  const g = cv.getContext('2d');
+  const fieldRng = makeRng(4242);
+  g.fillStyle = C.grass;
+  g.fillRect(0, 0, size, size);
+  for (let i = 0; i < 90; i++) {
+    const x = fieldRng.int(0, size - 1);
+    const y = fieldRng.int(0, size - 1);
+    g.fillStyle = fieldRng.chance(0.55) ? C.grassDark : fieldRng.chance(0.5) ? C.grassLite : C.grassSun;
+    g.fillRect(x, y, 1, 1);
+  }
+  return cv;
+}
+
+const fieldPattern = ctx.createPattern(bakeField(), 'repeat');
+
 // ---------------------------------------------------------------- overlays
 
 function caption(text, x, y, color = C.white) {
@@ -300,7 +323,7 @@ function drawGallery(view) {
     drawText(ctx, dims, Math.round(cx - dw / 2), top + row * cellH + 9, C.slate, { font: 'tiny' });
   });
   const pages = Math.ceil(specs.length / perPage);
-  drawText(ctx, `GALLERY ${page + 1}/${pages} Â· ${specs.length} variants`, 8, view.h - 9, C.lamp, { font: 'tiny' });
+  drawText(ctx, `GALLERY ${page + 1}/${pages} · ${specs.length} variants`, 8, view.h - 9, C.lamp, { font: 'tiny' });
   return true;
 }
 
@@ -308,7 +331,7 @@ function draw(view) {
   if (galleryMode) return drawGallery(view);
   const cam = computeCamera(view);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = C.grassDeep;
+  ctx.fillStyle = fieldPattern || C.grass;
   ctx.fillRect(0, 0, view.w, view.h);
   ctx.save();
   ctx.translate(-cam.x, -cam.y);
@@ -376,14 +399,15 @@ let panelTick = 0;
 function updatePanel() {
   const cam = computeCamera(view);
   panel.innerHTML = [
-    `<b>window</b> ${window.innerWidth}x${window.innerHeight} Â· ${(window.innerWidth / window.innerHeight).toFixed(2)}:1`,
-    `<b>scale</b> ${view.scale}x${view.forced ? ' (forced)' : ` (target ${targetH})`}`,
-    `<b>logical</b> ${view.w}x${view.h} â†’ canvas ${view.cssW}x${view.cssH}`,
+    `<b>window</b> ${window.innerWidth}x${window.innerHeight} · ${(window.innerWidth / window.innerHeight).toFixed(2)}:1`,
+    `<b>scale</b> ${view.scalePhys}px físico${view.forced ? ' (forced)' : ` · ${view.scaleCss.toFixed(2)}x CSS · dpr ${view.dpr}`}`,
+    `<b>field</b> target ${targetH}px · ${view.tilesH.toFixed(0)} tiles tall`,
+    `<b>logical</b> ${view.w}x${view.h} → canvas ${view.cssW}x${view.cssH}`,
     `<b>tiles</b> ${view.tilesW.toFixed(1)} x ${view.tilesH.toFixed(1)}`,
     `<b>safe ${SAFE_W}x${SAFE_H}</b> ${view.safeFits ? 'fully visible' : 'CROPPED'}`,
-    `<b>contract</b> npc ${SPEC.npc.w}x${SPEC.npc.h} Â· door ${SPEC.door.w}x${SPEC.door.h} Â· facade ${SPEC.facade}`,
+    `<b>contract</b> npc ${SPEC.npc.w}x${SPEC.npc.h} · door ${SPEC.door.w}x${SPEC.door.h} · facade ${SPEC.facade}`,
     `<b>door vs npc</b> ${doorFitsNpc() ? 'ok' : 'TOO SHORT'}`,
-    `<b>walker</b> tile ${walker.tx},${walker.ty} Â· ${walker.dir} Â· ${walker.state}${paused ? ' Â· PAUSED' : ''}`,
+    `<b>walker</b> tile ${walker.tx},${walker.ty} · ${walker.dir} · ${walker.state}${paused ? ' · PAUSED' : ''}`,
     `<b>camera</b> ${cam.x},${cam.y}`,
   ].join('<br>');
 }
@@ -391,7 +415,7 @@ function updatePanel() {
 function layout() {
   const cssW = window.innerWidth;
   const cssH = window.innerHeight;
-  view = computeView(cssW, cssH, targetH, zoom);
+  view = computeView(cssW, cssH, window.devicePixelRatio || 1, zoom, targetH);
   applyView(canvas, view, cssW, cssH);
   draw(view);
   updatePanel();
