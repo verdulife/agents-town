@@ -26,11 +26,17 @@ node tools/engram-import.mjs --dry-run   # what would be imported
 node tools/engram-import.mjs --out /tmp/pixel-town.json  # convert only
 ```
 
-The script derives each observation's `sync_id` from its project and note id, so
-re-running it is idempotent: Engram reports `skipped stale` instead of creating
-duplicates. It imports only what the vault holds; a note that was edited in
-Engram after the last export will not carry those edits, and ids assigned by the
-target store differ from the ones in the frontmatter.
+The script keys every observation on its **content**, not on the note id: when
+the store already holds an observation with the same type, title and text it
+reuses that observation's `sync_id`, and otherwise derives one from the content.
+That makes the import a true no-op on a store that already has this memory —
+Engram reports `skipped stale` — even after the note ids changed, which they do
+every time the vault is imported into a different store. It also strips the
+export's trailing `*Session*:` / `*Topic*:` backlinks, so they are never baked
+into the memory itself.
+
+It imports only what the vault holds: a note edited in Engram after the last
+export will not carry those edits.
 
 Not committed: Obsidian's own `.obsidian/` state, the export bookkeeping file,
 and the binary chunks that `engram sync` produces.
