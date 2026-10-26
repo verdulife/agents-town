@@ -5,7 +5,7 @@
 
 import { Painter, cacheSprite } from '../pixel.js';
 import { C, mix } from '../palette.js';
-import { drawText, lineWidth } from '../font.js';
+import { drawText, lineWidth, FONTS } from '../font.js';
 import { makeRng } from '../rng.js';
 import { TILE } from './art-spec.js';
 
@@ -35,7 +35,9 @@ const ROOFS = {
   graphite: { base: '#3b3f52', lite: '#575d76', dark: '#24273a' },
 };
 
-const ACCENTS = [C.neon, C.pink, C.lampWarm, C.purple, C.grassLite];
+// Sign colours. Warm yellow is deliberately absent: it read as a hazard sticker
+// on the facade, not as a shop sign.
+const ACCENTS = [C.neon, C.pink, C.purple, C.grassLite];
 
 // ------------------------------------------------------------ wall texture
 
@@ -194,19 +196,40 @@ function segAwning(p, x, y, w, h, color) {
   p.hline(x, ay + 4, w, C.ink);
 }
 
+// A fascia sign is a plate that hugs its own text, not a band across the whole
+// building: three pixels of padding, an ink frame, and never wider than the
+// facade it hangs on.
+const SIGN_PAD_X = 3;
+const SIGN_PAD_Y = 2;
+
+// Pure layout for a sign plate, so the "adapts to the text" rule is testable
+// without a canvas.
+export function signPlate(text, maxWidth) {
+  const tw = lineWidth(text, { font: 'tiny' });
+  return {
+    tw,
+    th: FONTS.tiny.rows,
+    w: Math.min(maxWidth, tw + SIGN_PAD_X * 2),
+    h: FONTS.tiny.rows + SIGN_PAD_Y * 2,
+  };
+}
+
 function segSign(p, x, y, w, h, text, color) {
-  const sh = 11;
-  const sy = y + 3;
-  p.rect(x + 1, sy, w - 2, sh, C.ink2);
-  p.rect(x + 2, sy + 1, w - 4, sh - 2, mix(color, C.ink, 0.55));
-  p.hline(x + 2, sy + 1, w - 4, mix(color, C.white, 0.3));
-  if (text) {
-    const big = lineWidth(text) <= w - 8;
-    const tw = lineWidth(text, { font: big ? 'big' : 'tiny' });
-    drawText(p.ctx, text, x + Math.round((w - tw) / 2), sy + (big ? 3 : 4), mix(color, C.white, 0.55), {
-      font: big ? 'big' : 'tiny',
-    });
-  }
+  if (!text) return;
+  const plate = signPlate(text, w);
+  const bx = x + Math.round((w - plate.w) / 2);
+  const by = y + 3;
+  p.rect(bx, by, plate.w, plate.h, C.ink2);
+  p.rect(bx + 1, by + 1, plate.w - 2, plate.h - 2, mix(color, C.ink, 0.55));
+  p.hline(bx + 1, by + 1, plate.w - 2, mix(color, C.white, 0.3));
+  drawText(
+    p.ctx,
+    text,
+    bx + Math.round((plate.w - plate.tw) / 2),
+    by + Math.round((plate.h - plate.th) / 2),
+    mix(color, C.white, 0.6),
+    { font: 'tiny' },
+  );
 }
 
 function segBalcony(p, x, y, w, h, mat) {
@@ -264,61 +287,18 @@ function paintShedRoof(p, W, roofD, roof) {
   p.rect(0, roofD - 3, W, 3, roof.dark);
 }
 
-function paintHipRoof(p, W, roofD, roof) {
-  // hip: a short ridge, with the four sides sloping toward the eaves
-  const ridgeW = Math.max(Math.round(W * 0.34), W - roofD * 2);
-  for (let y = 0; y < roofD; y++) {
-    const d = y / Math.max(1, roofD - 1);
-    const rowW = Math.round(ridgeW + (W - ridgeW) * d);
-    const x0 = Math.round((W - rowW) / 2);
-    p.hline(x0, y, rowW, y % 4 === 0 ? mix(roof.base, C.ink, 0.14) : roof.base);
-    if (y % 4 === 2) p.hline(x0, y, rowW, roof.lite);
-  }
-  p.hline(Math.round((W - ridgeW) / 2), 1, ridgeW, mix(roof.lite, C.white, 0.4));
-  p.rect(0, roofD - 3, W, 3, roof.dark);
-}
+// Roof depth and box metrics of a wing. Always shallower than the shallowest
+// host, so the composite never grows taller than the building it hangs on.
+const ANNEX_ROOF_D = { garage: 14, warehouse: 17 };
 
-// ------------------------------------------------------------ roof props
-
-function roofProp(p, kind, x, y, rng, roof) {
-  if (kind === 'chimney') {
-    p.rect(x, y - 12, 9, 14, C.brick);
-    p.dither(x, y - 12, 9, 14, C.brick, C.brickLite, 3);
-    p.rect(x - 1, y - 14, 11, 3, C.ink3);
-    p.hline(x - 1, y - 14, 11, C.slate);
-    p.rect(x + 2, y - 13, 5, 2, C.ink);
-  } else if (kind === 'ac') {
-    p.rect(x, y - 10, 14, 11, C.stoneLite);
-    p.rect(x + 1, y - 9, 12, 9, C.stone);
-    for (let i = 0; i < 6; i++) p.hline(x + 2, y - 8 + i, 10, C.slate);
-  } else if (kind === 'vent') {
-    p.rect(x, y - 7, 5, 8, C.slate);
-    p.rect(x - 1, y - 8, 7, 2, C.stoneLite);
-  } else if (kind === 'skylight') {
-    p.rect(x, y - 6, 12, 8, C.ink3);
-    p.rect(x + 1, y - 5, 10, 6, C.glass);
-    p.hline(x + 1, y - 5, 10, C.glassLite);
-  } else if (kind === 'tank') {
-    p.rect(x, y - 12, 12, 12, mix(C.wood, C.stone, 0.5));
-    p.hline(x, y - 8, 12, C.woodDark);
-    p.hline(x, y - 4, 12, C.woodDark);
-    p.rect(x + 2, y - 13, 8, 2, C.ink3);
-  } else if (kind === 'solar') {
-    p.rect(x, y - 8, 18, 9, C.ink3);
-    p.rect(x + 1, y - 7, 16, 7, '#124e89');
-    for (let i = 3; i < 17; i += 4) p.vline(x + i, y - 7, 7, C.neon);
-    p.hline(x + 1, y - 4, 16, C.neon);
-  } else if (kind === 'antenna') {
-    p.vline(x, y - 16, 17, C.slate);
-    p.hline(x - 3, y - 14, 7, C.slate);
-    p.hline(x - 2, y - 10, 5, C.slate);
-    p.px(x, y - 17, C.lampWarm);
-  } else if (kind === 'hatch') {
-    p.rect(x, y - 9, 13, 10, roof.dark);
-    p.rect(x + 1, y - 8, 11, 8, roof.base);
-    p.hline(x + 1, y - 8, 11, roof.lite);
-    p.rect(x + 4, y - 5, 5, 1, C.ink3);
-  }
+export function annexMetrics(annex) {
+  const roofD = ANNEX_ROOF_D[annex.type] ?? (annex.roofStyle === 'flat' ? 14 : 17);
+  return {
+    W: annex.tiles * TILE + OVERHANG * 2,
+    roofD,
+    facadeH: GROUND_H,
+    H: roofD + GROUND_H,
+  };
 }
 
 // Pure geometry, so the layout can be tested without a canvas.
@@ -327,148 +307,194 @@ export function buildingGeometry(spec) {
   const storeys = spec.storeys ?? 1;
   const roofD = spec.roofDepth ?? 34;
   const facadeH = GROUND_H + (storeys - 1) * STOREY_H;
+  const annex = spec.annex ? annexMetrics(spec.annex) : null;
   return {
-    W: tilesW * TILE + OVERHANG * 2,
+    // a wing widens the sprite; the host still owns the height
+    W: tilesW * TILE + OVERHANG * 2 + (annex ? annex.W : 0),
     H: roofD + facadeH,
     facadeH,
     roofD,
     facadeW: tilesW * TILE,
+    annexW: annex ? annex.W : 0,
+    annexH: annex ? annex.H : 0,
   };
 }
 
 // ------------------------------------------------------------- assembly
 
+// One box of building: its own roof plane, its props and its facade stack,
+// painted at (ox, oy). A host and its wing are two boxes on a shared ground
+// line, so the composite needs no seam drawn by hand.
+function paintBlock(p, ox, oy, cfg) {
+  const { tilesW, storeys, roofD, wall, roof } = cfg;
+  const W = tilesW * TILE + OVERHANG * 2;
+  const H = roofD + GROUND_H + (storeys - 1) * STOREY_H;
+  const X = (d) => ox + d;
+  const Y = (d) => oy + d;
+
+  // roof plane; drawn off to the side so the shared painters keep their 0,0 origin
+  const roofP = new Painter(W, roofD);
+  const kind = cfg.roofStyle || 'gable';
+  if (kind === 'flat') paintFlatRoof(roofP, W, roofD, roof);
+  else if (kind === 'shed') paintShedRoof(roofP, W, roofD, roof);
+  else paintGableRoof(roofP, W, roofD, roof);
+  p.blit(roofP, ox, oy);
+
+  // facade: one row of segments per storey, bottom up. The wall box can be
+  // flushed to a box edge on the side where a wing meets its host, so the two
+  // walls touch instead of leaving a transparent slot between the overhangs.
+  const flush = cfg.flush || null;
+  const wx = X(flush === 'left' ? 0 : OVERHANG);
+  const ww = W - (flush === 'left' ? 0 : OVERHANG) - (flush === 'right' ? 0 : OVERHANG);
+  const fx = X(OVERHANG);
+  const fw = W - OVERHANG * 2;
+  const floors = [];
+  floors.push({ ly: H - GROUND_H, h: GROUND_H, segs: cfg.ground || [{ kind: 'wall', tiles: tilesW }] });
+  for (let s = 1; s < storeys; s++) {
+    floors.push({ ly: H - GROUND_H - s * STOREY_H, h: STOREY_H, segs: cfg.upper || [{ kind: 'window', tiles: tilesW }] });
+  }
+
+  for (const floor of floors) {
+    const fy = oy + floor.ly;
+    paintWall(p, wx, fy, ww, floor.h, wall);
+    // storey separator
+    if (floor.ly > roofD) p.hline(wx, fy, ww, wall.dark);
+    let x = fx;
+    for (const seg of floor.segs) {
+      const sw = Math.round(seg.tiles * TILE);
+      const w = Math.min(sw, fx + fw - x);
+      if (w <= 0) break;
+      switch (seg.kind) {
+        case 'window':
+          segWindow(p, x, fy, w, floor.h, wall, seg);
+          break;
+        case 'shopfront':
+          segShopfront(p, x, fy, w, floor.h, wall);
+          break;
+        case 'door':
+          segDoor(p, x, fy, w, floor.h, wall, seg);
+          break;
+        case 'balcony':
+          segBalcony(p, x, fy, w, floor.h, wall);
+          break;
+        case 'sign':
+          segSign(p, x, fy, w, floor.h, seg.text, seg.color || ACCENTS[0]);
+          break;
+        case 'awning':
+          segAwning(p, x, fy, w, floor.h, seg.color);
+          break;
+        case 'steps':
+          segSteps(p, x, fy, w, floor.h, wall, seg);
+          break;
+        case 'garage':
+          segGarage(p, x, fy, w, floor.h);
+          break;
+        case 'arch':
+          segArch(p, x, fy, w, floor.h);
+          break;
+        default:
+          segWall(p, x, fy, w, floor.h, wall);
+      }
+      x += sw;
+    }
+  }
+
+  // plinth and cornice: two bands that make a flat wall read as a building
+  p.rect(wx, Y(H - 3), ww, 3, mix(wall.base, C.ink, 0.35));
+  p.hline(wx, Y(H - 4), ww, wall.lite);
+  p.rect(wx, Y(roofD) + 1, ww, 3, mix(wall.base, C.ink, 0.22));
+  p.hline(wx, Y(roofD) + 1, ww, mix(wall.base, C.white, 0.25));
+  for (let s2 = 1; s2 < storeys; s2++) {
+    const yy = Y(H - GROUND_H - s2 * STOREY_H);
+    p.rect(wx, yy, ww, 2, mix(wall.base, C.ink, 0.2));
+    p.hline(wx, yy, ww, mix(wall.base, C.white, 0.2));
+  }
+
+  // downspouts from the eave to the ground
+  if (cfg.spouts !== false) {
+    for (const sx of [fx + 2, fx + fw - 4]) {
+      p.rect(sx, Y(roofD) + 4, 2, H - roofD - 8, C.slate);
+      p.vline(sx, Y(roofD) + 4, H - roofD - 8, mix(C.slate, C.white, 0.2));
+      for (let yy = Y(roofD) + 8; yy < Y(H) - 8; yy += 14) p.rect(sx - 1, yy, 4, 1, C.ink3);
+    }
+  }
+
+  // wall-mounted details from the seed: a pipe or an AC box
+  for (const detail of cfg.details || []) {
+    if (detail === 'ac') {
+      const ax = fx + fw - 18;
+      p.rect(ax, Y(roofD) + 8, 12, 8, C.stoneLite);
+      p.rect(ax + 1, Y(roofD) + 9, 10, 6, C.stone);
+      for (let i = 0; i < 4; i++) p.hline(ax + 2, Y(roofD) + 10 + i, 8, C.slate);
+    } else if (detail === 'vent') {
+      const vx = fx + Math.round(fw / 2) - 4;
+      p.rect(vx, Y(roofD) + 7, 8, 6, C.slate);
+      for (let i = 0; i < 3; i++) p.hline(vx + 1, Y(roofD) + 8 + i * 2, 6, C.ink3);
+    }
+  }
+
+  // awnings and signs sit over the ground floor, so they draw last
+  if (cfg.sign) segSign(p, fx + 2, Y(H - GROUND_H) - 2, fw - 4, GROUND_H, cfg.sign, cfg.signColor || ACCENTS[1]);
+  if (cfg.canopy) segAwning(p, fx + 3, Y(H - GROUND_H) + 12, fw - 6, GROUND_H, cfg.canopy);
+}
+
+// Ground-floor segments of a wing: a door that suits its type, wall for the rest.
+function annexGround(annex) {
+  const tw = annex.tiles;
+  if (annex.type === 'garage') {
+    // one 2-tile garage door, then wall
+    return tw >= 2.5
+      ? [{ kind: 'wall', tiles: 0.5 }, { kind: 'garage', tiles: 2 }, { kind: 'wall', tiles: tw - 2.5 }]
+      : [{ kind: 'garage', tiles: tw }];
+  }
+  // warehouse: a 2-tile double door, then wall
+  return tw >= 2.5
+    ? [{ kind: 'wall', tiles: 0.5 }, { kind: 'door', tiles: 2, double: true }, { kind: 'wall', tiles: tw - 2.5 }]
+    : [{ kind: 'door', tiles: 2, double: true }];
+}
+
 export function buildingSprite(spec) {
   const key = `bld2|${JSON.stringify(spec)}`;
   return cacheSprite(cache, key, () => {
-    const tilesW = spec.tilesW ?? 4;
-    const storeys = spec.storeys ?? 1;
-    const roofD = spec.roofDepth ?? 34;
-    const wall = WALLS[spec.wall] || WALLS.plaster;
-    const roof = ROOFS[spec.roof] || ROOFS.red;
-    const rng = makeRng((spec.seed ?? 1) * 7919 + tilesW * 31 + storeys);
-    const W = tilesW * TILE + OVERHANG * 2;
-    const facadeH = GROUND_H + (storeys - 1) * STOREY_H;
-    const H = roofD + facadeH;
-    const p = new Painter(W, H);
+    const geo = buildingGeometry(spec);
+    const annex = spec.annex || null;
+    const am = annex ? annexMetrics(annex) : null;
+    const p = new Painter(geo.W, geo.H);
 
-    // roof plane
-    const kind = spec.roofStyle || 'gable';
-    if (kind === 'flat') paintFlatRoof(p, W, roofD, roof);
-    else if (kind === 'shed') paintShedRoof(p, W, roofD, roof);
-    else if (kind === 'hip') paintHipRoof(p, W, roofD, roof);
-    else paintGableRoof(p, W, roofD, roof);
-
-    // roof props, placed inside the plane
-    const props = spec.roofProps || [];
-    for (let i = 0; i < props.length; i++) {
-      const px = 6 + Math.round((i + 0.5) * ((W - 24) / Math.max(1, props.length)));
-      roofProp(p, props[i], px, roofD - 4, rng, roof);
+    if (annex) {
+      // the wing shares the ground line, so it starts above it by its own height
+      const ax = annex.side === 'left' ? 0 : geo.W - am.W;
+      paintBlock(p, ax, geo.H - am.H, {
+        tilesW: annex.tiles,
+        storeys: 1,
+        roofD: am.roofD,
+        roofStyle: annex.roofStyle,
+        wall: WALLS[annex.wall] || WALLS.concrete,
+        roof: ROOFS[annex.roof] || ROOFS.slate,
+        ground: annexGround(annex),
+        // flush on the side that meets the host, overhang on the open side
+        flush: annex.side === 'left' ? 'right' : 'left',
+        spouts: false,
+      });
     }
 
-    // facade: one row of segments per storey, bottom up
-    const fx = OVERHANG;
-    const fw = W - OVERHANG * 2;
-    const floors = [];
-    floors.push({ y: H - GROUND_H, h: GROUND_H, segs: spec.ground || [{ kind: 'wall', tiles: tilesW }] });
-    for (let s = 1; s < storeys; s++) {
-      const y = H - GROUND_H - s * STOREY_H;
-      floors.push({ y, h: STOREY_H, segs: spec.upper || [{ kind: 'window', tiles: tilesW }] });
-    }
+    paintBlock(p, annex && annex.side === 'left' ? am.W : 0, 0, {
+      tilesW: spec.tilesW ?? 4,
+      storeys: spec.storeys ?? 1,
+      roofD: spec.roofDepth ?? 34,
+      roofStyle: spec.roofStyle,
+      wall: WALLS[spec.wall] || WALLS.plaster,
+      roof: ROOFS[spec.roof] || ROOFS.red,
+      ground: spec.ground,
+      upper: spec.upper,
+      details: spec.details,
+      sign: spec.sign,
+      signColor: spec.signColor,
+      canopy: spec.canopy,
+      flush: annex ? annex.side : null,
+    });
 
-    for (const floor of floors) {
-      paintWall(p, fx, floor.y, fw, floor.h, wall);
-      // storey separator
-      if (floor.y > roofD) p.hline(fx, floor.y, fw, wall.dark);
-      let x = fx;
-      for (const seg of floor.segs) {
-        const sw = Math.round(seg.tiles * TILE);
-        const w = Math.min(sw, fx + fw - x);
-        if (w <= 0) break;
-        switch (seg.kind) {
-          case 'window':
-            segWindow(p, x, floor.y, w, floor.h, wall, seg);
-            break;
-          case 'shopfront':
-            segShopfront(p, x, floor.y, w, floor.h, wall);
-            break;
-          case 'door':
-            segDoor(p, x, floor.y, w, floor.h, wall, seg);
-            break;
-          case 'balcony':
-            segBalcony(p, x, floor.y, w, floor.h, wall);
-            break;
-          case 'sign':
-            segSign(p, x, floor.y, w, floor.h, seg.text, seg.color || ACCENTS[0]);
-            break;
-          case 'awning':
-            segAwning(p, x, floor.y, w, floor.h, seg.color);
-            break;
-          case 'steps':
-            segSteps(p, x, floor.y, w, floor.h, wall, seg);
-            break;
-          case 'garage':
-            segGarage(p, x, floor.y, w, floor.h);
-            break;
-          case 'arch':
-            segArch(p, x, floor.y, w, floor.h);
-            break;
-          default:
-            segWall(p, x, floor.y, w, floor.h, wall);
-        }
-        x += sw;
-      }
-    }
-
-    // plinth and cornice: two bands that make a flat wall read as a building
-    p.rect(fx, H - 3, fw, 3, mix(wall.base, C.ink, 0.35));
-    p.hline(fx, H - 4, fw, wall.lite);
-    p.rect(fx, roofD + 1, fw, 3, mix(wall.base, C.ink, 0.22));
-    p.hline(fx, roofD + 1, fw, mix(wall.base, C.white, 0.25));
-    for (let s2 = 1; s2 < storeys; s2++) {
-      const yy = H - GROUND_H - s2 * STOREY_H;
-      p.rect(fx, yy, fw, 2, mix(wall.base, C.ink, 0.2));
-      p.hline(fx, yy, fw, mix(wall.base, C.white, 0.2));
-    }
-
-    // downspouts from the eave to the ground
-    for (const px of [fx + 2, fx + fw - 4]) {
-      p.rect(px, roofD + 4, 2, H - roofD - 8, C.slate);
-      p.vline(px, roofD + 4, H - roofD - 8, mix(C.slate, C.white, 0.2));
-      for (let yy = roofD + 8; yy < H - 8; yy += 14) p.rect(px - 1, yy, 4, 1, C.ink3);
-    }
-
-    // wall-mounted details from the seed: a pipe, an AC box or a hanging sign
-    for (const detail of spec.details || []) {
-      if (detail === 'ac') {
-        const ax = fx + fw - 18;
-        p.rect(ax, roofD + 8, 12, 8, C.stoneLite);
-        p.rect(ax + 1, roofD + 9, 10, 6, C.stone);
-        for (let i = 0; i < 4; i++) p.hline(ax + 2, roofD + 10 + i, 8, C.slate);
-      } else if (detail === 'hangingSign') {
-        // bracket, two hangers, then a bordered board: a sign, not a floating box
-        const sx = fx + 4;
-        const sy = H - GROUND_H - 20;
-        p.rect(sx, sy, 12, 2, C.ink3);
-        p.rect(sx + 1, sy - 1, 2, 1, C.slate);
-        p.rect(sx + 4, sy + 2, 1, 3, C.ink3);
-        p.rect(sx + 9, sy + 2, 1, 3, C.ink3);
-        p.rect(sx + 1, sy + 5, 12, 11, C.ink);
-        p.rect(sx + 2, sy + 6, 10, 9, C.lampWarm);
-        p.hline(sx + 2, sy + 6, 10, mix(C.lampWarm, C.white, 0.5));
-        p.rect(sx + 4, sy + 9, 6, 1, C.ink2);
-        p.rect(sx + 4, sy + 12, 4, 1, C.ink2);
-      } else if (detail === 'vent') {
-        const vx = fx + Math.round(fw / 2) - 4;
-        p.rect(vx, roofD + 7, 8, 6, C.slate);
-        for (let i = 0; i < 3; i++) p.hline(vx + 1, roofD + 8 + i * 2, 6, C.ink3);
-      }
-    }
-
-    // awnings and signs sit over the ground floor, so they draw last
-    if (spec.sign) segSign(p, fx + 2, H - GROUND_H - 2, fw - 4, GROUND_H, spec.sign, spec.signColor || ACCENTS[1]);
-    if (spec.canopy) segAwning(p, fx + 3, H - GROUND_H + 12, fw - 6, GROUND_H, spec.canopy);
-
+    // one outline for the whole composite: it also traces the notch above the wing
     p.outline(C.ink);
     return p.sprite();
   });
@@ -488,7 +514,6 @@ export const BUILDING_TYPES = {
     widths: [4, 5],
     ground: (tw) => [{ kind: 'wall', tiles: 1 }, { kind: 'steps', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: Math.max(0.5, tw - 3) }],
     upper: (tw) => repeat([{ kind: 'window', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: 1 }], tw),
-    roofProps: ['chimney', 'vent'],
   },
   townhouse: {
     label: 'TOWNHOUSE',
@@ -500,7 +525,6 @@ export const BUILDING_TYPES = {
     widths: [3],
     ground: () => [{ kind: 'door', tiles: 1 }, { kind: 'shopfront', tiles: 2 }],
     upper: () => [{ kind: 'balcony', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'window', tiles: 1 }],
-    roofProps: ['ac', 'tank'],
   },
   shop: {
     label: 'SHOP',
@@ -513,7 +537,6 @@ export const BUILDING_TYPES = {
     ground: (tw) => [{ kind: 'shopfront', tiles: Math.max(2, tw - 1) }, { kind: 'door', tiles: 1 }],
     canopy: true,
     sign: true,
-    roofProps: ['ac', 'skylight', 'vent'],
   },
   apartment: {
     label: 'APARTMENT',
@@ -525,7 +548,6 @@ export const BUILDING_TYPES = {
     widths: [5, 6],
     ground: (tw) => [{ kind: 'door', tiles: 1 }, { kind: 'wall', tiles: tw - 2 }, { kind: 'shopfront', tiles: 1 }],
     upper: (tw) => repeat([{ kind: 'balcony', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'window', tiles: 1 }], tw),
-    roofProps: ['ac', 'solar', 'antenna', 'tank'],
   },
   warehouse: {
     label: 'WAREHOUSE',
@@ -536,7 +558,8 @@ export const BUILDING_TYPES = {
     roofs: ['slate', 'graphite', 'green'],
     widths: [6, 7],
     ground: (tw) => [{ kind: 'wall', tiles: 1 }, { kind: 'door', tiles: 2, double: true }, { kind: 'wall', tiles: tw - 3 }],
-    roofProps: ['vent', 'skylight', 'skylight'],
+    // never a building on its own: only a wing on a host (annexFor)
+    attached: true,
   },
   garage: {
     label: 'GARAGE',
@@ -547,7 +570,7 @@ export const BUILDING_TYPES = {
     roofs: ['slate', 'graphite'],
     widths: [3, 4],
     ground: (tw) => [{ kind: 'wall', tiles: 0.5 }, { kind: 'garage', tiles: 2 }, { kind: 'wall', tiles: Math.max(0.5, tw - 2.5) }],
-    roofProps: ['vent'],
+    attached: true,
   },
   hotel: {
     label: 'HOTEL',
@@ -560,19 +583,6 @@ export const BUILDING_TYPES = {
     ground: (tw) => [{ kind: 'door', tiles: 1 }, { kind: 'shopfront', tiles: 2 }, { kind: 'wall', tiles: Math.max(0.5, tw - 3) }],
     upper: (tw) => repeat([{ kind: 'window', tiles: 1 }, { kind: 'balcony', tiles: 1 }, { kind: 'window', tiles: 1 }], tw),
     sign: true,
-    roofProps: ['tank', 'ac'],
-  },
-  civic: {
-    label: 'CIVIC',
-    storeys: 2,
-    roofStyle: 'hip',
-    roofDepth: 32,
-    walls: ['stone', 'concrete'],
-    roofs: ['green', 'blue', 'slate'],
-    widths: [7, 8],
-    ground: (tw) => [{ kind: 'wall', tiles: 1 }, { kind: 'arch', tiles: 2 }, { kind: 'window', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: tw - 5 }],
-    upper: (tw) => repeat([{ kind: 'window', tiles: 1 }, { kind: 'window', tiles: 1 }, { kind: 'wall', tiles: 1 }], tw),
-    roofProps: ['hatch', 'chimney'],
   },
 };
 
@@ -581,7 +591,9 @@ export const BUILDING_TYPES = {
 // browser.
 export const STREET_TYPES = ['house', 'shop', 'apartment'];
 
-const SIGNS = ['CAFE', 'PAN', 'BOOKS', 'HOTEL', 'BAR', 'MARKET', 'FLORES', 'TECH', 'RAMEN', 'CINE'];
+// Shop fascia names. The sign face is caps-only, so glyphOf folds these up; they
+// stay in natural case so a future face with lowercase needs no change here.
+const SIGNS = ['Cafe', 'Pan', 'Books', 'Hotel', 'Bar', 'Market', 'Flores', 'Tech', 'Ramen', 'Cine'];
 
 // Cycle a segment pattern until the floor is full, so wide buildings are not
 // half blank wall.
@@ -603,6 +615,12 @@ function repeat(pattern, tilesW) {
 export function variantFor(typeName, seed = 1) {
   const type = BUILDING_TYPES[typeName];
   if (!type) throw new Error(`unknown building type: ${typeName}`);
+  if (type.attached) {
+    throw new Error(
+      `${typeName} is attached-only: it has no standalone sprite. ` +
+        `Build it as a wing with annexFor(hostType, '${typeName}', seed) on one of ${ANCHOR_HOSTS.join(', ')}.`,
+    );
+  }
   const rng = makeRng(seed * 104729 + typeName.length * 7919);
   const pick = (arr) => arr[Math.floor(rng() * arr.length) % arr.length];
   const tilesW = pick(type.widths);
@@ -617,13 +635,12 @@ export function variantFor(typeName, seed = 1) {
     roof: pick(type.roofs),
     ground: type.ground ? type.ground(tilesW) : [{ kind: 'wall', tiles: tilesW }],
     upper: type.upper ? type.upper(tilesW) : [{ kind: 'window', tiles: tilesW }],
-    roofProps: type.roofProps || [],
     canopy: type.canopy ? pick([C.roofRedLite, C.neon, C.pink, C.lampWarm]) : null,
     sign: type.sign ? pick(SIGNS) : null,
     signColor: pick(ACCENTS),
   };
   // one or two wall-mounted details, so a plain facade still has something to read
-  const detailPool = ['ac', 'hangingSign', 'vent'];
+  const detailPool = ['ac', 'vent'];
   spec.details = detailPool.filter(() => rng() < 0.45).slice(0, 2);
   // trim segments that would overflow the facade
   const trim = (segs) => {
@@ -643,10 +660,46 @@ export function variantFor(typeName, seed = 1) {
   return spec;
 }
 
+// Hosts that can carry a wing. A shop is allowed, but the gallery leaves it out:
+// a one-storey shop is only a few pixels taller than a warehouse wing.
+export const ANCHOR_HOSTS = ['house', 'townhouse', 'shop', 'apartment', 'hotel'];
+const GALLERY_HOSTS = ['house', 'townhouse', 'apartment', 'hotel'];
+
+// A host with a wing attached. The host keeps its own type, materials, props and
+// seed; the wing brings only what it needs to read as an annex.
+export function annexFor(hostType, annexType, seed = 1) {
+  const host = BUILDING_TYPES[hostType];
+  if (!host) throw new Error(`unknown host type: ${hostType}`);
+  if (host.attached) throw new Error(`${hostType} cannot host an annex: it only exists attached to a host`);
+  const wing = BUILDING_TYPES[annexType];
+  if (!wing) throw new Error(`unknown annex type: ${annexType}`);
+  if (!wing.attached) throw new Error(`${annexType} is a standalone building, not an annex`);
+  const rng = makeRng(seed * 6151 + hostType.length * 397 + annexType.length * 37);
+  const pick = (arr) => arr[Math.floor(rng() * arr.length) % arr.length];
+  const spec = variantFor(hostType, seed);
+  spec.annex = {
+    type: annexType,
+    tiles: pick([2, 3]),
+    side: pick(['left', 'right']),
+    wall: pick(wing.walls),
+    roof: pick(wing.roofs),
+    roofStyle: annexType === 'warehouse' ? 'shed' : 'flat',
+  };
+  return spec;
+}
+
 export function gallerySpecs(seed = 1, perType = 3) {
   const out = [];
   for (const [name, type] of Object.entries(BUILDING_TYPES)) {
-    for (let i = 0; i < perType; i++) out.push(variantFor(name, seed + i * 13 + name.length));
+    for (let i = 0; i < perType; i++) {
+      const s = seed + i * 13 + name.length;
+      if (!type.attached) {
+        out.push(variantFor(name, s));
+        continue;
+      }
+      // a wing type never appears alone: it is shown hanging off a host
+      out.push(annexFor(GALLERY_HOSTS[(i + seed + name.length) % GALLERY_HOSTS.length], name, s));
+    }
   }
   return out;
 }

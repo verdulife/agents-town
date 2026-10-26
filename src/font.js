@@ -1,5 +1,5 @@
-// Two bitmap fonts: a 5x7 "big" one for short labels (shop signs) and a 3x5
-// "tiny" one for dense displays (billboards, the CRT kiosk). Layout helpers pick
+// Two bitmap fonts: a 5x7 "big" one for short labels and a 3x5 "tiny" one for
+// dense displays (billboards, the CRT kiosk, shop fascias). Layout helpers pick
 // the largest font that fits a rect and wrap text, so a message can never spill
 // out of its panel again.
 
@@ -107,6 +107,10 @@ const TINY_ROWS = [
   '·:...|...|.#.|...|...',
 ];
 
+// Sign face: 5x6, one row shorter than "big", with real lowercase. Cap height is
+// five rows and the x-height is four, so a name set in mixed case reads lighter
+// and smaller than the same name in caps, which is what a shop fascia wants.
+// Baseline is row 4; row 5 carries the descenders of g, j, p, q and y.
 function compile(rows) {
   const glyphs = {};
   for (const entry of rows) {
@@ -122,7 +126,9 @@ export const FONTS = {
 };
 
 const fontOf = (name) => FONTS[name] || FONTS.big;
-const glyphOf = (font, ch) => font.glyphs[ch] || font.glyphs['?'];
+// Fonts that only carry capitals still answer for lowercase text, so a caller can
+// pass "Bar" to the 5x7 face and get "BAR" without pre-processing the string.
+const glyphOf = (font, ch) => font.glyphs[ch] || font.glyphs[ch.toUpperCase()] || font.glyphs['?'];
 
 export function lineWidth(text, { font = 'big', scale = 1, spacing = 1 } = {}) {
   const f = fontOf(font);
@@ -141,7 +147,7 @@ export function drawText(ctx, text, x, y, color, opts = {}) {
   let cx = Math.round(x);
   const cy = Math.round(y);
   for (const ch of String(text)) {
-    const rows = glyphOf(f, ch.toUpperCase());
+    const rows = glyphOf(f, ch);
     for (let r = 0; r < f.rows; r++) {
       const row = rows[r] || '';
       for (let c = 0; c < f.cols; c++) {

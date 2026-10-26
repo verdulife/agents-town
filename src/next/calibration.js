@@ -261,6 +261,17 @@ function drawRuler() {
   caption('1 TILE = 16px', x0 + len / 2, y - 8, C.lamp);
 }
 
+// A composite wing is captioned with both names, so a page cannot show an
+// unexplained box: `GARAGE/HOUSE 3x1 flat` is a garage hung on a house.
+// (The tiny face has no `@`, and src/font.js is out of reach here, so `/` it is.)
+function galleryLabel(spec) {
+  if (spec.annex) {
+    const a = spec.annex;
+    return `${a.type.toUpperCase()}/${spec.type.toUpperCase()} ${a.tiles}x1 ${a.roofStyle}`;
+  }
+  return `${spec.type.toUpperCase()} ${spec.tilesW}x${spec.storeys} ${spec.roofStyle}`;
+}
+
 function drawGallery(view) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#14161f';
@@ -281,7 +292,7 @@ function drawGallery(view) {
     ctx.fillStyle = 'rgba(255,255,255,0.07)';
     ctx.fillRect(col * cellW + 6, cy + 1, cellW - 12, 1);
     ctx.drawImage(spr.canvas, Math.round(cx - spr.w / 2), Math.round(cy - spr.h));
-    const label = `${spec.type.toUpperCase()} ${spec.tilesW}x${spec.storeys} ${spec.roofStyle}`;
+    const label = galleryLabel(spec);
     const lw = lineWidth(label, { font: 'tiny' });
     drawText(ctx, label, Math.round(cx - lw / 2), top + row * cellH + 2, C.stoneLite, { font: 'tiny' });
     const dims = `${spr.w}x${spr.h}`;
@@ -289,7 +300,7 @@ function drawGallery(view) {
     drawText(ctx, dims, Math.round(cx - dw / 2), top + row * cellH + 9, C.slate, { font: 'tiny' });
   });
   const pages = Math.ceil(specs.length / perPage);
-  drawText(ctx, `GALLERY ${page + 1}/${pages} · ${specs.length} variants`, 8, view.h - 9, C.lamp, { font: 'tiny' });
+  drawText(ctx, `GALLERY ${page + 1}/${pages} Â· ${specs.length} variants`, 8, view.h - 9, C.lamp, { font: 'tiny' });
   return true;
 }
 
@@ -365,14 +376,14 @@ let panelTick = 0;
 function updatePanel() {
   const cam = computeCamera(view);
   panel.innerHTML = [
-    `<b>window</b> ${window.innerWidth}x${window.innerHeight} · ${(window.innerWidth / window.innerHeight).toFixed(2)}:1`,
+    `<b>window</b> ${window.innerWidth}x${window.innerHeight} Â· ${(window.innerWidth / window.innerHeight).toFixed(2)}:1`,
     `<b>scale</b> ${view.scale}x${view.forced ? ' (forced)' : ` (target ${targetH})`}`,
-    `<b>logical</b> ${view.w}x${view.h} → canvas ${view.cssW}x${view.cssH}`,
+    `<b>logical</b> ${view.w}x${view.h} â†’ canvas ${view.cssW}x${view.cssH}`,
     `<b>tiles</b> ${view.tilesW.toFixed(1)} x ${view.tilesH.toFixed(1)}`,
     `<b>safe ${SAFE_W}x${SAFE_H}</b> ${view.safeFits ? 'fully visible' : 'CROPPED'}`,
-    `<b>contract</b> npc ${SPEC.npc.w}x${SPEC.npc.h} · door ${SPEC.door.w}x${SPEC.door.h} · facade ${SPEC.facade}`,
+    `<b>contract</b> npc ${SPEC.npc.w}x${SPEC.npc.h} Â· door ${SPEC.door.w}x${SPEC.door.h} Â· facade ${SPEC.facade}`,
     `<b>door vs npc</b> ${doorFitsNpc() ? 'ok' : 'TOO SHORT'}`,
-    `<b>walker</b> tile ${walker.tx},${walker.ty} · ${walker.dir} · ${walker.state}${paused ? ' · PAUSED' : ''}`,
+    `<b>walker</b> tile ${walker.tx},${walker.ty} Â· ${walker.dir} Â· ${walker.state}${paused ? ' Â· PAUSED' : ''}`,
     `<b>camera</b> ${cam.x},${cam.y}`,
   ].join('<br>');
 }
