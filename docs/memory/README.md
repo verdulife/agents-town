@@ -1,6 +1,6 @@
 # Project memory
 
-Readable snapshot of this project's Engram memory. Regenerate with:
+Readable snapshot of this project's Engram memory:
 
 ```bash
 engram obsidian-export --vault docs/memory --project pixel-town
@@ -14,6 +14,23 @@ Why it lives in the repo: the local SQLite store is the source of truth, and thi
 folder is the durable, reviewable projection of it. `.engram/config.json` is what
 makes sessions started in this directory file their memory under `pixel-town`
 instead of the parent directory's project.
+
+## Restoring this memory into a store
+
+`obsidian-export` is one-way, so memory is rebuilt from the vault through
+Engram's JSON import format:
+
+```bash
+npm run memory:import            # convert the vault and import it
+node tools/engram-import.mjs --dry-run   # what would be imported
+node tools/engram-import.mjs --out /tmp/pixel-town.json  # convert only
+```
+
+The script derives each observation's `sync_id` from its project and note id, so
+re-running it is idempotent: Engram reports `skipped stale` instead of creating
+duplicates. It imports only what the vault holds; a note that was edited in
+Engram after the last export will not carry those edits, and ids assigned by the
+target store differ from the ones in the frontmatter.
 
 Not committed: Obsidian's own `.obsidian/` state, the export bookkeeping file,
 and the binary chunks that `engram sync` produces.
