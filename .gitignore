@@ -3,3 +3,8 @@ dist/
 .vite/
 *.local
 .DS_Store
+
+# Engram: native sync chunks stay out of the repo; the readable export is in docs/memory
+.engram/*.chunk
+docs/memory/.obsidian/
+docs/memory/engram/.engram-sync-state.json
