@@ -1,5 +1,5 @@
 ---
-id: 265
+id: 324
 type: decision
 project: pixel-town
 scope: project
@@ -25,6 +25,9 @@ aliases:
 4. Small street details: outside stairs, mailboxes, house numbers, railings.
 5. Data layer: providers/ (static + real clock first, then Open-Meteo weather - keyless, ACAO * verified - then gentle-shell agents, which need a local endpoint because the browser cannot read ~/.gentle-shell). Rule: the render never fetches; it consumes one snapshot per frame, so screenshots stay deterministic.
 **Where**: C:/Users/verdu/agent-bg/pixel-town
+
+---
+*Session*: [[session-manual-save-pixel-town]]
 
 ---
 *Session*: [[session-manual-save-pixel-town]]

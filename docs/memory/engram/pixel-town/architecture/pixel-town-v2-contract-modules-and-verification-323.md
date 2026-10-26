@@ -1,5 +1,5 @@
 ---
-id: 264
+id: 323
 type: architecture
 project: pixel-town
 scope: project
@@ -26,6 +26,9 @@ aliases:
 **Walker** (walker.js): grid movement, four directions, tile centres, blocked tiles, deterministic; ?sim=N&pause=1 for reproducible captures.
 **How to verify**: npm run dev -> calibration.html; node tools/{smoke,scale-check,walker-check,buildings-check}.mjs (12/12, 12 resolutions, 7/7, 10/10).
 **Lessons**: wide gable roofs need a long ridge (else a tent); hip must widen ridge->eave (else an hourglass); at 10px a character needs Painter.outlineSelective(); reference characters are 1:2.5 w:h (ours was 1:1.67 = the fat look); a removed type name once killed the page silently, STREET_TYPES + a test now catch it; painting is testable in Node with tools/canvas-stub.mjs.
+
+---
+*Session*: [[session-manual-save-pixel-town]]
 
 ---
 *Session*: [[session-manual-save-pixel-town]]

@@ -8,5 +8,5 @@ tags:
 # Session: manual-save-pixel-town
 
 ## Observations
-- [[pixel-town-v2-contract-modules-and-verification-264]]
-- [[pixel-town-agreed-next-steps-265]]
+- [[pixel-town-v2-contract-modules-and-verification-323]]
+- [[pixel-town-agreed-next-steps-324]]
