@@ -10,7 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "smoke": "node tools/smoke.mjs",
-    "memory:import": "node tools/engram-import.mjs"
+    "memory:import": "node tools/engram-import.mjs",
+    "terrain:check": "node tools/terrain-check.mjs",
+    "floor:check": "node tools/floor-check.mjs"
   },
   "devDependencies": {
     "vite": "^8.3.5"
