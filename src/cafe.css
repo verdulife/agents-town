@@ -1,0 +1,17 @@
+/* The cafeteria prototype carries one canvas and nothing else. `#menu` is the shell's and
+   is not restyled here: a page keeps only what it needs. */
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0d0f1a;
+}
+
+canvas {
+  position: absolute;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
