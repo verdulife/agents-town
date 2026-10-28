@@ -174,7 +174,7 @@
   }
 </style>
 </head>
-<body>
+<body data-root="../">
   <canvas id="town" width="384" height="216"></canvas>
 
   <div id="hud">
@@ -198,7 +198,7 @@ npm run dev</pre>
     <p>Any static server works too: <code>python -m http.server 8000</code></p>
   </div>
 
-  <script type="module" src="./src/main.js"></script>
+  <script type="module" src="../src/main.js"></script>
   <script>
     // ES modules are blocked on file:// - tell the user instead of showing a blank page.
     setTimeout(function () {
@@ -207,5 +207,6 @@ npm run dev</pre>
       document.getElementById('hud').style.display = 'none';
     }, 1500);
   </script>
+  <script type="module" src="../src/shell.js"></script>
 </body>
 </html>
