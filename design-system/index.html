@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Pixel Town · design system</title>
+</head>
+<body data-root="../">
+  <main>
+    <h1>design system · v3 · cinematic city</h1>
+    <canvas id="sheet" width="1800" height="1120"></canvas>
+    <section id="keys">
+      <h2>every key</h2>
+      <p class="note">The same colours the sheet draws, as text, so nothing has to be picked off a screenshot.</p>
+      <table id="key-table"></table>
+    </section>
+    <section id="rules">
+      <h2>the rules</h2>
+      <ol>
+        <li>Shadow is cold, light is warm. Structural shadow leans blue-violet; every practical light leans amber. That split is what makes the street read as dusk, not the detail.</li>
+        <li>Nothing is pure. White is bone, ink is blue-black. No <code>#fff</code> and no <code>#000</code> anywhere.</li>
+        <li>Mid-tones stay desaturated: the saturation budget belongs to the lights, so walls, asphalt and sky stay quiet and the signs do not.</li>
+        <li>Ramps step in hue as well as value — a wall's highlight is warmer than its base, its shadow cooler. Stepping brightness alone is what makes pixel art look flat.</li>
+      </ol>
+    </section>
+  </main>
+  <script type="module" src="../src/design-system.js"></script>
+  <script type="module" src="../src/shell.js"></script>
+</body>
+</html>

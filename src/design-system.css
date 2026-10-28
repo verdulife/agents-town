@@ -1,0 +1,122 @@
+/* The design sheet is not a scene: its size must not depend on the window, so a capture
+   of it is comparable with the next one. The canvas is fixed at two device pixels per art
+   pixel and scaled down by CSS only when the window is narrow. */
+
+html,
+body {
+  margin: 0;
+  background: #0d0f1a;
+  color: #a4abb8;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+main {
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 0 0 64px;
+}
+
+#sheet {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+section {
+  padding: 24px 28px 0;
+}
+
+h1 {
+  margin: 0;
+  padding: 18px 28px 14px;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #efeade;
+}
+
+h2 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #efeade;
+}
+
+.note {
+  margin: 0 0 14px;
+  font-size: 11px;
+  color: #67718a;
+}
+
+#key-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+#key-table td {
+  padding: 3px 8px 3px 0;
+  border-bottom: 1px solid #1e2333;
+  white-space: nowrap;
+}
+
+#key-table td.hex {
+  color: #67718a;
+  font-variant-numeric: tabular-nums;
+}
+
+#key-table td.ramp {
+  color: #f0a24a;
+}
+
+#key-table td.chip {
+  width: 26px;
+}
+
+#key-table td.chip span {
+  display: block;
+  width: 22px;
+  height: 12px;
+  border: 1px solid #1e2333;
+}
+
+ol {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 11px;
+  color: #a4abb8;
+}
+
+#ramp-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+}
+
+#ramp-list li {
+  margin-bottom: 12px;
+}
+
+#ramp-list b {
+  color: #efeade;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+#ramp-list .hex {
+  color: #67718a;
+}
+
+li {
+  margin-bottom: 6px;
+}
+
+code {
+  color: #35d6d0;
+}
