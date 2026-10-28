@@ -237,7 +237,10 @@ const {
   decalDressing,
 } = await import('../src/next/terrain.js');
 const { TILE } = await import('../src/next/art-spec.js');
-const { C } = await import('../src/palette.js');
+// The same palette module the catalogue paints with. The checks below compare painted
+// pixels against palette names, so reading a different palette would fail on a colour
+// that changed rather than on a rule that broke.
+const { C } = await import('../src/next/palette.js');
 
 // Every pixel of a sprite as strings, row by row: what "the same pixels" means.
 function pixelGrid(spr) {

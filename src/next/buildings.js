@@ -4,7 +4,7 @@
 // so a new building type is a preset, not a drawing.
 
 import { Painter, cacheSprite } from '../pixel.js';
-import { C, mix } from '../palette.js';
+import { C, mix } from './palette.js';
 import { drawText, lineWidth, FONTS } from '../font.js';
 import { makeRng } from '../rng.js';
 import { TILE } from './art-spec.js';

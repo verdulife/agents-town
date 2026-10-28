@@ -8,7 +8,7 @@
 // ground, and the card bake (T5) paints the floor from terrainPatch.
 
 import { Painter, cacheSprite } from '../pixel.js';
-import { C, mix } from '../palette.js';
+import { C, mix } from './palette.js';
 import { makeRng } from '../rng.js';
 import { TILE } from './art-spec.js';
 

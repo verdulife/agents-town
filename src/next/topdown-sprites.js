@@ -3,7 +3,7 @@
 // a number, not a redraw.
 
 import { Painter, cacheSprite } from '../pixel.js';
-import { C, mix } from '../palette.js';
+import { C, mix } from './palette.js';
 import { drawText, lineWidth } from '../font.js';
 import { makeRng } from '../rng.js';
 import { SPEC } from './art-spec.js';
