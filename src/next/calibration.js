@@ -1,6 +1,8 @@
 // Calibration card v2: the proportion contract drawn at real scale, with a
 // template that checks a door against an NPC, and the guaranteed-visible rect.
 
+import './gallery.css';
+
 import {
   computeView,
   computeCamera,
@@ -50,17 +52,18 @@ import {
 } from './topdown-sprites.js';
 import { floorSprite, floorFrame } from './floor.js';
 import { createWalker, stepWalker, simulate, tileCenter } from './walker.js';
-import { C, rgba, mix } from '../palette.js';
+import { C, rgba, mix } from './palette.js';
 import { drawText, lineWidth } from '../font.js';
 import { makeRng } from '../rng.js';
 const params = new URLSearchParams(location.search);
 const targetH = Number(params.get('target')) || TARGET_H;
 const zoom = Number(params.get('zoom')) || 0;
 const showGrid = params.get('grid') !== '0';
-const galleryMode = params.get('gallery') === '1';
-// The terrain catalogue has its own gallery: ?gallery=terrain&page=N. The
-// buildings keep ?gallery=1 untouched, and the default card is unaffected.
-const terrainMode = params.get('gallery') === 'terrain';
+// Each gallery is its own document (/gallery/buildings/, /gallery/terrain/) and says so
+// on its body, so no page has to pass a mode through the query string.
+const galleryKind = document.body.dataset.gallery ?? '';
+const galleryMode = galleryKind === 'buildings';
+const terrainMode = galleryKind === 'terrain';
 const page = Number(params.get('page')) || 0;
 const startPaused = params.get('pause') === '1';
 const simSeconds = Number(params.get('sim')) || 0;
@@ -310,6 +313,12 @@ const TRANS_PATCH_Z = 1;
 const TRANS_PATCH = [10, 6];
 const TRANS_SEED = 4;
 
+const PAGE_HINT_TINY = { font: 'tiny' };
+
+// The menu is fixed in the top-right corner of every page, so a gallery leaves that strip
+// empty instead of drawing a caption underneath it.
+const GALLERY_TOP_ROOM = 26;
+
 function drawTerrainGallery(view) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#14161f';
@@ -318,13 +327,17 @@ function drawTerrainGallery(view) {
   const pageIndex = Math.min(Math.max(0, Math.floor(page)), TERRAIN_PAGES.length - 1);
   const entry = TERRAIN_PAGES[pageIndex];
   const pairs = entry.kind === 'pairs';
+  const inner = { ...view, h: view.h - GALLERY_TOP_ROOM };
 
-  drawText(ctx, `TERRAIN / ${entry.title}`, 14, 9, C.lamp, { font: 'tiny' });
+  ctx.save();
+  ctx.translate(0, GALLERY_TOP_ROOM);
+  drawText(ctx, `TERRAIN / ${entry.title}`, 14, 2, C.lamp, PAGE_HINT_TINY);
   let animated = 0;
-  if (pairs) drawTransitionPage(view, entry);
-  else if (entry.kind === 'water') animated = drawWaterPage(view, entry);
-  else if (entry.kind === 'decals') animated = drawDecalPage(view);
-  else drawMaterialPage(view, entry);
+  if (pairs) drawTransitionPage(inner, entry);
+  else if (entry.kind === 'water') animated = drawWaterPage(inner, entry);
+  else if (entry.kind === 'decals') animated = drawDecalPage(inner);
+  else drawMaterialPage(inner, entry);
+  ctx.restore();
 
   const shown = pairs
     ? `${entry.items.length} PAIRS · 13 TILES EACH · COMPOSED ${TRANS_PATCH[0]}x${TRANS_PATCH[1]}`
@@ -341,8 +354,6 @@ function drawTerrainGallery(view) {
     C.lamp,
     { font: 'tiny' },
   );
-  const hint = `?gallery=terrain&page=${TERRAIN_PAGES.map((_, i) => i).join(' · ')}`;
-  drawText(ctx, hint, view.w - lineWidth(hint, { font: 'tiny' }) - 14, view.h - 11, C.slate, { font: 'tiny' });
   return true;
 }
 
@@ -785,12 +796,15 @@ function drawGallery(view) {
   ctx.fillStyle = '#14161f';
   ctx.fillRect(0, 0, view.w, view.h);
   const specs = gallerySpecs(1);
-  const perPage = 9;
+  const perPage = GALLERY_PER_PAGE;
   const cols = 3;
+  const inner = { ...view, h: view.h - GALLERY_TOP_ROOM };
   const top = 6;
-  const cellW = Math.floor(view.w / cols);
-  const cellH = Math.floor((view.h - top - 14) / 3);
+  const cellW = Math.floor(inner.w / cols);
+  const cellH = Math.floor((inner.h - top - 14) / 3);
   const items = specs.slice(page * perPage, page * perPage + perPage);
+  ctx.save();
+  ctx.translate(0, GALLERY_TOP_ROOM);
   items.forEach((spec, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
@@ -801,15 +815,53 @@ function drawGallery(view) {
     ctx.fillRect(col * cellW + 6, cy + 1, cellW - 12, 1);
     ctx.drawImage(spr.canvas, Math.round(cx - spr.w / 2), Math.round(cy - spr.h));
     const label = galleryLabel(spec);
-    const lw = lineWidth(label, { font: 'tiny' });
-    drawText(ctx, label, Math.round(cx - lw / 2), top + row * cellH + 2, C.stoneLite, { font: 'tiny' });
+    const lw = lineWidth(label, PAGE_HINT_TINY);
+    drawText(ctx, label, Math.round(cx - lw / 2), top + row * cellH + 2, C.stoneLite, PAGE_HINT_TINY);
     const dims = `${spr.w}x${spr.h}`;
-    const dw = lineWidth(dims, { font: 'tiny' });
-    drawText(ctx, dims, Math.round(cx - dw / 2), top + row * cellH + 9, C.slate, { font: 'tiny' });
+    const dw = lineWidth(dims, PAGE_HINT_TINY);
+    drawText(ctx, dims, Math.round(cx - dw / 2), top + row * cellH + 9, C.slate, PAGE_HINT_TINY);
   });
+  ctx.restore();
   const pages = Math.ceil(specs.length / perPage);
-  drawText(ctx, `GALLERY ${page + 1}/${pages} · ${specs.length} variants`, 8, view.h - 9, C.lamp, { font: 'tiny' });
+  drawText(ctx, `GALLERY ${page + 1}/${pages} · ${specs.length} variants`, 8, view.h - 9, C.lamp, PAGE_HINT_TINY);
   return true;
+}
+
+// ------------------------------------------------------- gallery page links
+// A gallery paginates on the canvas, which used to mean a line of text spelling
+// out the URL of every page. The links at the foot of the page are the same
+// navigation, clickable: they carry every other query parameter over, so a frozen
+// capture (?anim=0) or a reproducible one (?pause=1&sim=N) survives a page change.
+const GALLERY_PER_PAGE = 9;
+
+function pageHref(index) {
+  const next = new URLSearchParams(location.search);
+  next.set('page', String(index));
+  return `?${next.toString()}`;
+}
+
+function renderPageNav(titles) {
+  const nav = document.getElementById('pages');
+  if (!nav || titles.length === 0) return;
+  const last = titles.length - 1;
+  const at = Math.min(Math.max(0, Math.floor(page)), last);
+  const add = (label, index, title, arrow = false) => {
+    const link = document.createElement('a');
+    link.textContent = label;
+    link.title = title;
+    if (arrow && index === at) {
+      // the end of the list: the arrow is still there, but there is nowhere to go
+      link.setAttribute('aria-disabled', 'true');
+    } else {
+      link.href = pageHref(index);
+      if (index === at) link.setAttribute('aria-current', 'page');
+    }
+    nav.append(link);
+  };
+  if (titles.length > 1) add('‹', Math.max(0, at - 1), 'previous page', true);
+  titles.forEach((title, i) => add(String(i + 1), i, `${i + 1} · ${title}`));
+  if (titles.length > 1) add('›', Math.min(last, at + 1), 'next page', true);
+  nav.hidden = false;
 }
 
 function draw(view) {
@@ -889,6 +941,7 @@ let view = null;
 let panelTick = 0;
 
 function updatePanel() {
+  if (!panel) return;
   const cam = computeCamera(view);
   panel.innerHTML = [
     `<b>window</b> ${window.innerWidth}x${window.innerHeight} · ${(window.innerWidth / window.innerHeight).toFixed(2)}:1`,
@@ -942,8 +995,23 @@ function tick(now) {
 }
 
 if (galleryMode || terrainMode) {
-  document.getElementById('readout').style.display = 'none';
-  document.getElementById('legend').style.display = 'none';
+  // a gallery page carries no panels: the canvas is the whole review
+  document.getElementById('readout')?.style.setProperty('display', 'none');
+  document.getElementById('legend')?.style.setProperty('display', 'none');
+  if (terrainMode) {
+    renderPageNav(TERRAIN_PAGES.map((entry) => entry.title));
+  } else {
+    // the building pages are unnamed, so each link says which variants it carries
+    const specs = gallerySpecs(1);
+    const pages = Math.ceil(specs.length / GALLERY_PER_PAGE);
+    renderPageNav(
+      Array.from({ length: pages }, (_, i) => {
+        const first = i * GALLERY_PER_PAGE + 1;
+        const end = Math.min(specs.length, (i + 1) * GALLERY_PER_PAGE);
+        return `${specs.length} variants · ${first}-${end}`;
+      }),
+    );
+  }
 }
 
 window.addEventListener('resize', layout);
