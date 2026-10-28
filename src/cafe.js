@@ -3,10 +3,11 @@
 // gym are added at the same storey, so the one question is answered by eye and by numbers: does
 // the whole street fit?
 //
-// The street is composed, in the order a street reads: the masses, then the cafeteria art, then
-// the alley between it and the offices, then the person in front of the cafeteria. Every width
-// comes from streetLayout, which reads the view's own width, and the readout prints the layout
-// back at the bottom left.
+// The street is composed, in the order a street reads: the alley first (it is a recess, so what
+// oversails it has to end up in front of it), then the cafeteria, the offices and the gym — all
+// four of them art now — and then the person in front of the cafeteria. Every width comes from
+// streetLayout, which reads the view's own width, and the readout prints the layout back at the
+// bottom right.
 //
 // The page scales itself exactly like the rest of the town: computeView gives the largest
 // integer number of physical pixels per art pixel that keeps TARGET_H on screen, so on a
@@ -24,9 +25,10 @@ import { computeView, applyView, TARGET_H } from './next/scale.js';
 import { terrainPatch } from './next/terrain.js';
 import { drawText, lineWidth } from './font.js';
 import { CAFE, cafeSprite, cafeLayout, personSprite, cafeAnimations, wireSprite } from './next/cafe.js';
-import { streetLayout, streetReadout, blockSprite, paintBlockLabels } from './next/street.js';
+import { streetLayout, streetReadout, paintBlockLabels } from './next/street.js';
 import { alleySprite } from './next/alley.js';
 import { gymSprite } from './next/gym.js';
+import { officesSprite } from './next/offices.js';
 
 const TILE_PX = 16;
 const canvas = document.getElementById('scene');
@@ -185,40 +187,42 @@ function paintStill(view) {
   ctx.rect(0, 0, w, h);
   ctx.clip();
 
-  // 1. the masses: offices and gym as silhouettes, between the buildings
-  for (const b of street.blocks) {
-    const sprite = blockSprite(b);
-    if (sprite) ctx.drawImage(sprite.canvas, b.x, groundY - b.h);
-  }
-
-  // 2. the alley first: it is a recess, so everything the cafeteria oversails has to end up in
+  // 1. the alley first: it is a recess, so everything the cafeteria oversails has to end up in
   // front of it. Drawn after the cafeteria, the niche's wall cut the plinth, the string course
-  // and the cornice exactly where they step past the 192, which read as three cut bands
+  // and the cornice exactly where they step past the 192, which read as three cut bands. The
+  // masses that used to stand here are gone: all four blocks are art now
   const slot = street.blocks.find((b) => b.kind === 'alley');
   const niche = alleySprite({ leftH: slot.flanks.leftH, rightH: slot.flanks.rightH });
   ctx.drawImage(niche.canvas, slot.x, groundY - niche.h);
 
-  // 3. the cafeteria's art, at x=0, its own sprite height setting the ground line. The sprite is
+  // 2. the cafeteria's art, at x=0, its own sprite height setting the ground line. The sprite is
   // drawn wider than the 192 so the plinth, the string course and the cornice can oversail it:
   // the building's mass still starts exactly at the left limit, and its bands pass in front of
   // the alley's mouth instead of being cut by it
   ctx.fillStyle = rgba(C.ink, 0.32);
   ctx.fillRect(0, groundY, layout.w, 3);
   ctx.drawImage(building.canvas, -layout.bleed, groundY - layout.h);
-  // 3a. the clothesline's wire, over the café and over its own washing: one px, no outline, so
+  // 2a. the clothesline's wire, over the café and over its own washing: one px, no outline, so
   // it reads as a wire at 10x instead of as a steel tube. Its box is in the layout's own art
   // coordinates, so it climbs the same ground line the building does and needs no bleed: the
   // building's canvas is padded by `bleed` and the wire's is not
   ctx.drawImage(wire.canvas, wireAt.x, groundY - layout.h + wireAt.y);
 
-  // 3b. the gym, at its block's x with its bottom row on the same ground line. It is art now,
+  // 2b. the offices, at their block's x with their bottom row on the same ground line, after
+  // the alley and before the gym. offices.js owns their 302x326: four storeys and a lift, drawn
+  // instead of massed, and the block it stands on is the width the sprite already has.
+  const officesBlock = street.blocks.find((b) => b.kind === 'offices');
+  const offices = officesSprite();
+  ctx.drawImage(offices.canvas, officesBlock.x, groundY - offices.h);
+
+  // 2c. the gym, at its block's x with its bottom row on the same ground line. It is art now,
   // not a mass: gym.js owns its 240x188, and the block it stands on is the width the layout
   // gives it — at the frame the street was measured at, the same 240.
   const gymBlock = street.blocks.find((b) => b.kind === 'gym');
   const gym = gymSprite();
   ctx.drawImage(gym.canvas, gymBlock.x, groundY - gym.h);
 
-  // 4. the one person on the pavement, in front of the brick pier between the door and the
+  // 3. the one person on the pavement, in front of the brick pier between the door and the
   // glass: their feet are on the ground line the building's own bottom row sits on, so their
   // 30 art px are measured from the same line as the six diners' 26
   const feet = groundY;
