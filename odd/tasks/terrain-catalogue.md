@@ -71,7 +71,8 @@ it only reflects; the natural floor breathes.
 
 | id | task | specs | route | commit |
 | --- | --- | --- | --- | --- |
-| T1 | `src/next/terrain.js`: material spec + 12 base materials with variants, tile and patch generation, hash-based variant picker, gallery page 1 | S1, S8, S9, S10 | worker | `feat(terrain): material specs and the base grounds` || T2 | 13-tile transition sets for the six pairs, gallery page 2 | S2, S6 | worker | `feat(terrain): thirteen-tile transitions` |
+| T1 | `src/next/terrain.js`: material spec + 12 base materials with variants, tile and patch generation, hash-based variant picker, gallery page 1 | S1, S8, S9, S10 | worker | `feat(terrain): material specs and the base grounds` |
+| T2 | 13-tile transition sets for the six pairs, gallery page 2 | S2, S6 | worker | `feat(terrain): thirteen-tile transitions` |
 | T3 | water: current, pond, banks, reeds, 4-frame animation, gallery page 3 | S3, S7 | worker | `feat(terrain): water with current, ponds and banks` |
 | T4 | decals (grass tufts, flowers, cracks, patched asphalt, manholes, moss) + animation strips page | S5, S7 | worker | `feat(terrain): ground decals and animation strips` |
 | T5 | wire the card's ground bake to the terrain catalogue and drive the animations from the sim clock | S7, S9 | parent | `feat(terrain): bake the card floor from the catalogue` |
@@ -194,3 +195,16 @@ lamp posts, trees, bins, the walker), field again. Changes that came with it:
   proven by the gallery's composed sample and the pair checks.
 Captures: `pt-shots/trial-street.png` (wrong: furniture on the tarmac),
 `trial-street2.png` and `street-adopted.png` (adopted look).
+
+L13: gallery pagination is clickable. The canvases used to print
+`?gallery=terrain&page=0 · 1 · 2 …` at the foot of the page; the same navigation is
+now a row of links in `calibration.html` (`#pages`), filled by `renderPageNav()` from
+the mode's own page data: terrain labels each link with its page title, buildings with
+the variant range, the current page is marked `aria-current="page"`, and the arrow at
+either end is present but inert. Each link re-serialises `location.search`, so
+`anim=0`, `pause=1&sim=N`, `zoom` and `target` survive a page change. Verified with
+headless Chrome DOM dumps (6 terrain pages, 3 building pages) and the six check
+scripts still green (231).
+L14: Verdu's visual pass on the galleries is **deferred on purpose** — he wants to look
+at everything together before correcting. Those corrections are open and unnamed; the
+next pass (street catalogue) starts without them.

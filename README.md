@@ -113,12 +113,36 @@ src/rng.js          seeded RNG (same seed, same town)
 tools/smoke.mjs     headless checks (see below)
 ```
 
-## Top-down v2 (work in progress)
+## Places
+
+Every place is its own document, so no address needs a single-page router and no host
+needs a rewrite rule (`appType: 'mpa'` in `vite.config.js`; an unknown path is a 404):
+
+| path | what it is |
+| --- | --- |
+| `/` | the hub: what this is and where everything lives |
+| `/cafe/` | the street as it is built: cafeteria, alley, gym; `?zoom=`, `?sky=`, `?debug=1`, `?pause=1&sim=N` |
+| `/design-system/` | the palette sheet: ramps, forbidden pairs, skies, real material |
+| `/gallery/buildings/` | the building catalogue, one page per nine variants |
+| `/gallery/terrain/` | the floor catalogue, six pages |
+| `/gallery/card/` | the top-down measuring card (parked while the front view is built) |
+| `/archive/` | the first diorama, untouched |
+
+The menu in the top-right corner is injected by `src/shell.js` on every page. Its links
+are computed from the page's own `data-root` (`""`, `"../"`, `"../../"`), which keeps them
+correct from `vite dev`, from `dist/` at a domain root, and from a subfolder.
+
+## Top-down v2 (parked)
+
+The town is becoming a frontal cutaway of one street (offices, cafeteria, gym, an alley,
+the sky) — see `odd/tasks/front-scene.md`. The material below is the part that survives,
+because a building catalogue is already painted as an elevation; the floor, the walker
+and the top-down card are parked with it.
 
 The diorama in `index.html` is v1. The next town is a fixed-framing top-down
 view, and it lives beside v1 while its proportions are being agreed:
 
-- `calibration.html` - the measuring card: buildings, an NPC in four directions,
+- `/gallery/card/` - the measuring card: buildings, an NPC in four directions,
   a kiosk, props, the 16px grid, the guaranteed-visible rect and a ruler.
   `?zoom=2|3|4` pins the scale for A/B comparison, `?target=320|360|400` changes
   the height target, `?grid=0` and `?labels=0` strip the overlays.
@@ -142,7 +166,15 @@ view, and it lives beside v1 while its proportions are being agreed:
   props (chimney, AC, vent, skylight, tank, solar, antenna, hatch). Eight presets
   (house, townhouse, shop, apartment, warehouse, garage, hotel, civic) and
   `variantFor(type, seed)` returns a deterministic variant.
-  `?gallery=1&page=0` renders nine of them per page with labels and sizes.
+  `/gallery/buildings/?page=0` renders nine of them per page with labels and sizes.
+- `/gallery/terrain/?page=0` is the floor catalogue's own gallery (six pages:
+  grounds, transitions, water, dressing). Both galleries link their pages at the
+  foot of the page instead of printing the URL, and a link keeps every other
+  query parameter, so a frozen (`?anim=0`) or reproducible (`?pause=1&sim=N`)
+  capture survives a page change.
+- `/design-system/` is the colour sheet: every ramp, the pairs that must never
+  touch, four skies and the same material the town uses, drawn by the renderer
+  (`src/next/palette.js`).
 
   Detail layers: shopfronts show a lit interior, every building has a plinth, a
   cornice under the roof and one between storeys, downspouts on both edges, and
