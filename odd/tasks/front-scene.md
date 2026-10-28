@@ -131,7 +131,8 @@ tiempos muy largos".
 | T6 | the alley: one-storey back wall behind the street, shade, moustache, dumpster, drain (the vertical thermometer sign dropped) | S20 | worker | `feat(alley): the passage behind the street` |
 | T7 | the gym: two glazed floors, grey structure, corporate accent, counter, stairs that line up, treadmills, weights, bikes, roof screen | S21 | worker | `feat(gym): glass, machines and a roof screen` |
 | T8 | the café's terrace: stair bulkhead behind the wall, flue with a turning ball, smoke, clothesline with two garments, black cat on a 220 s routine | S19, S22 | worker | `feat(cafe): a lived-in roof` |
-| T9 | the offices: four floors, 302x326, with the stairs and the lift drawn inside the cut | S3, S4, S5 | worker | not started |
+| T9 | the offices: four floors, 302x326 — entrance only on the ground floor, one lift inside on every floor and no stairs, working as a whole open-plan floor, the other four states in two split floors | S3, S4, S5 | worker | `feat(offices): four floors, the lift inside and the brick bookends` |
+| T10 | the offices' furniture pass: the duct collars at 2x, the 1 px desk props, planning vs implementing telling apart, the sofa against the TV, and leave detail on the lift | S3 | worker | not started |
 
 ## Log
 
@@ -457,4 +458,42 @@ lowest parts are the **two bellies**, with a **notch between them** (the mouth).
 crowns at rows 0-1 with a shallow 2-row V, a thick nearly straight body at rows 2-7, the points
 carried to the extremes on one row (row 4) and pulled back the next (thin tips), and rows 8-9 as
 `3..15 / 18..28` then `5..13 / 20..26` so the bellies hang lower than the mouth notch.
+
+L30: the offices are built (`src/next/offices.js`, 302x326) as a first prototype. Four storeys of 64
+with 10 slabs, one **44 px lift spine** at the left edge with the same opening (x 10..33) on every
+floor, dense dark-metal glazing (14 panes of 16 at an 18 pitch, against the gym's 22), ribbed
+spandrels, brick spine and parapet, and the corporate accent used exactly once, on the plate over the
+ground floor's lift. Rooms by state: **F0 the entrance only** (counter, bench, two tall plants, the
+open cab), **F1 planning + implementing**, **F2 exploring + deciding**, **F3 working whole floor**
+(seven desks in two rows, plus the sofa-and-TV corner) — the user's call: working is the longest and
+most common state, so it gets the largest room.
+
+Change of intent recorded: L6 asked for stairs *and* a lift so the NPC would not teleport. The user
+decided against the stairs in L31 — the lift is the only circulation, always in the same place on
+every floor, which is what makes floor-to-floor movement legible. L6 is therefore superseded on that
+point.
+
+Known first-pass weaknesses, measured rather than guessed: the duct collars every 44 px smear into a
+dotted line at 2x; the 1 px desk props (cups, trays) become speckle at 2x; and the planning and
+implementing rooms are the weakest pair to tell apart at scene scale, because both are desk rooms and
+only the whiteboard separates them.
+
+L31: the offices' second pass, on the user's two notes ("que el ascensor este dentro del edificio no
+fuera, y añadimos mas pared de tocho por ambos lados... asi separaremos visualmente la ofi del gym").
+The lift is now a **44 px shaft inside** the building: the facade is one continuous glazed plane from
+pier to pier, the shaft's brick, leaves, indicators and open cab are painted **before** the glass veil
+and under the mullions, and one bar lands exactly on the leaves' meeting seam — that bar is the cue
+that says "inside". **Piers: 14 px left, 30 px right**, both full height in the building's own brick
+with one stone coping across the whole width; the right one is the party wall to the gym and carries a
+cast-iron downpipe and a bricked-up opening, so the masonry has scale.
+
+Consequences worth keeping: the grid went from 14 panes of 16 at an 18 pitch to **13 panes of 18 at a
+20 pitch**, because 258 px of glazing between the two piers divides exactly that way (still denser than
+the gym's 22); the rooms are 217 wide, split 98 + 3 px partition + 116 on floors 1 and 2; the furniture
+was re-derived (implementing 3 -> 2 desks, exploring 2 -> 1, working 7 -> 5), and the deciding room
+loses its second plant because the gap to the cabinet is 1 px. The shaft's face is painted **lighter**
+than the piers on purpose (`brickFace lit 0.8`): dark, it regressed to two pale doors in a black slot.
+
+Open for the correction round: the lift leaves are still plain slabs — they would gain from a
+floor-number panel or a dark reveal — and at 2 px/art px the interiors still speckle.
 
