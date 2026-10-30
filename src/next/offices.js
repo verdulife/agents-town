@@ -61,6 +61,7 @@
 // sprite pixel is an art pixel, y grows down, and the sprite's bottom row is the ground line.
 
 import { Painter, cacheSprite } from '../pixel.js';
+import { drawText, lineWidth, FONTS } from '../font.js';
 import { C, mix, rgba } from './palette.js';
 import { makeRng } from '../rng.js';
 
@@ -114,6 +115,18 @@ export const OFFICES = {
     duct: { h: 4, gap: 1, ring: 44, inset: 6 },
     lamp: { drop: 4, housing: 3, w: 20, glow: 4 },
   },
+  // The room's own name, on a plate in the band above its window. Only the states listed here are
+  // labelled, so a room can be left unlabelled by deleting one line: the face is the tiny 3x5
+  // stencil, the smallest one that still reads at 2 physical px per art px.
+  labels: {
+    entering: 'ENTRANCE',
+    planning: 'PLANNING',
+    implementing: 'IMPLEMENTING',
+    exploring: 'EXPLORING',
+    deciding: 'DECIDING',
+    working: 'WORKING',
+  },
+  label: { padX: 3, padY: 1, spacing: 2 },
   // the rooms, bottom up. The state is the agent task the room is for, and it is the only
   // thing a floor says about itself: what stands in a room is derived from this word.
   plan: [
@@ -131,7 +144,6 @@ export const OFFICES = {
       slab: 3,
       monitor: { w: 9, h: 9 },
       chair: { w: 6, h: 7 },
-      backRow: 12, // how far the second row of desks stands behind the first
     },
     plant: { w: 12, h: 18 },
     tallPlant: { w: 16, h: 28 },
@@ -482,7 +494,9 @@ function furnish(room, door = null) {
       return props;
     }
     // working: one open plan, the biggest team. The lounge is the corner by the lift, then the
-    // desks in front of it and a second row behind them, and the plant at the far end
+    // desks in front of it, and the plant at the far end. One row only: a second row behind it
+    // read as desks floating in the room, because nothing at this scale says which floor they
+    // stand on once the front row covers the timber.
     case 'working': {
       const lounge = x + 8;
       const desksX = x + F.lounge.w + 6;
@@ -491,7 +505,6 @@ function furnish(room, door = null) {
         { kind: 'tv', x: lounge + F.sofa.w + 8, w: F.tv.cabinet.w, base: row },
         { kind: 'plant', x: lounge + F.sofa.w + F.tv.cabinet.w + 12, w: F.plant.w, base: row },
         ...deskRun({ x: desksX, w: x + w - desksX, base: row }),
-        ...deskRun({ x: desksX + 18, w: x + w - desksX - 36, base: row - F.desk.backRow }, 0.22),
         { kind: 'plant', x: x + w - F.plant.w - 2, w: F.plant.w, base: row },
       ];
     }
@@ -755,6 +768,34 @@ function paintCeiling(p, room) {
       p.rect(cx - Math.round(gw / 2), top + lamp.housing + 1 + i, gw, 1, rgba(C.lampWarm, 0.12 - i * 0.026));
     }
   }
+}
+
+// The room's name, on a small plate in the band above its window: the tiny 3x5 face with 2 px
+// between glyphs, 3 px of padding each side and 1 above and below, so the plate hugs its word and
+// stands in the 10 rows of cladding with 2 to spare over it.
+//
+// The band is the only place in the building a label fits on every floor. Inside, the boards hang
+// from the transom (the pinboard's top is 10 rows under it) and the desks' monitors reach to within
+// 23 — in a room 54 rows tall with the duct and the pendants taking the first 22, the four narrower
+// rooms have no free wall at that height at all. The band is also what a plaque on a facade is: the
+// name reads over the window it belongs to, outside the glass, so no veil and no mullion touches it.
+function paintRoomLabel(p, band, room) {
+  const text = OFFICES.labels[room.state];
+  if (!text) return;
+  const { padX, padY, spacing } = OFFICES.label;
+  const tw = lineWidth(text, { font: 'tiny', spacing });
+  const w = tw + padX * 2;
+  const h = FONTS.tiny.rows + padY * 2;
+  const x = room.x + Math.round((room.w - w) / 2);
+  const y = band.slabTop + Math.round((OFFICES.slab - h) / 2);
+  // the plate: dark steel, one lit row along its top, one ink row under it, so it reads as a
+  // plaque bolted to the cladding and not as a hole in it
+  p.rect(x, y, w, h, MAT.frame.dark);
+  p.hline(x, y, w, mix(MAT.frame.base, MAT.frame.lite, 0.5));
+  p.hline(x, y + h - 1, w, mix(MAT.frame.dark, C.ink, 0.4));
+  // the name, warm bone: over cladding this dark the letters are the only thing that has to
+  // carry, so they take the brightest value the palette has
+  drawText(p.ctx, text, x + padX, y + padY, mix(C.white, C.lampWarm, 0.12), { font: 'tiny', spacing });
 }
 
 // The two split floors are two rooms because of this: 3 px of frame and glass with a door in
@@ -1453,6 +1494,8 @@ export function officesSprite() {
       if (band.door) paintEntrance(p, band, L);
       paintTransomBand(p, band, L);
       paintSlabBand(p, band, L);
+      // the names last, in the cladding above each window: on the building, not in the room
+      for (const room of band.rooms) paintRoomLabel(p, band, room);
     }
     return p.sprite();
   });
