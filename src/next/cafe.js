@@ -715,10 +715,50 @@ function mirror(sprite) {
 
 // The one look per (pose, facing, seed): the scene reuses these instead of redrawing a
 // person, so the six people inside the window and the one on the pavement are one cast.
-export function personSprite({ pose = 'stand', facing = 1, seed = 0 } = {}) {
+// The walk, two frames of it: the standing figure with the legs in stride and the arms swinging against them.
+// In an elevation a person walks across the frame, so the stride is the whole animation — a bouncing torso reads
+// as a limp at ten pixels. `phase` 0 has the left leg forward and 1 the right.
+function paintWalking(p, look, phase) {
+  const { skin, hair, shirt, trouser, shoe } = look;
+  const mid = mix(skin, C.ink, 0.18);
+  const lead = phase === 0 ? 1 : -1;
+  // legs in stride: the forward one straight and lit, the back one shaded and half a foot shorter
+  const frontX = 4 + (lead > 0 ? 0 : 3);
+  const backX = 8 - (lead > 0 ? 0 : 3);
+  p.rect(frontX, 19, 3, 9, mix(trouser, C.ink, 0.18));
+  p.vline(frontX, 19, 9, mix(trouser, C.white, 0.14));
+  p.rect(backX, 19, 3, 8, mix(trouser, C.ink, 0.34));
+  p.rect(frontX - 1, 28, 4, 2, shoe);
+  p.rect(backX, 27, 4, 2, mix(shoe, C.ink, 0.25));
+  p.px(frontX + 2, 28, mix(shoe, C.white, 0.28));
+  // torso, a pixel narrower at the waist than standing, because the figure is turning into the step
+  p.rect(3, 9, 8, 10, shirt);
+  p.vline(3, 9, 10, mix(shirt, C.white, 0.22));
+  p.vline(10, 9, 10, mix(shirt, C.ink, 0.3));
+  p.hline(6, 9, 3, mix(shirt, C.ink, 0.45));
+  // arms swing against the legs: the forward leg's opposite arm is forward
+  const armX = lead > 0 ? 11 : 1;
+  const backArmX = lead > 0 ? 1 : 11;
+  p.rect(armX, 10, 2, 8, mix(shirt, C.ink, 0.12));
+  p.rect(armX, 18, 2, 2, skin);
+  p.rect(backArmX, 11, 2, 7, mix(shirt, C.ink, 0.3));
+  p.rect(backArmX, 18, 2, 2, mid);
+  // neck, head — the head does not bob: at this size a bobbing head is a wobble
+  p.rect(6, 8, 3, 1, mid);
+  p.rect(4, 0, 7, 8, skin);
+  p.rect(4, 0, 7, 2, hair);
+  p.rect(4, 2, 2, 5, hair);
+  p.px(9, 4, C.ink2);
+  p.px(10, 5, mid);
+  p.hline(5, 7, 5, mix(skin, C.ink, 0.3));
+}
+
+export function personSprite({ pose = 'stand', facing = 1, seed = 0, phase = 0 } = {}) {
   const dir = facing < 0 ? -1 : 1;
   const seated = pose === 'seat';
-  return cacheSprite(cache, `person|${seated ? 'seat' : 'stand'}|${dir}|${seed}`, () => {
+  const walking = pose === 'walk';
+  const step = walking ? (phase ? 1 : 0) : 0;
+  return cacheSprite(cache, `person|${seated ? 'seat' : walking ? `walk${step}` : 'stand'}|${dir}|${seed}`, () => {
     const rng = makeRng(CAFE.seed + seed * 977 + (seated ? 313 : 0) + (dir < 0 ? 61 : 0));
     const look = {
       skin: rng.pick(SKIN),
@@ -729,7 +769,9 @@ export function personSprite({ pose = 'stand', facing = 1, seed = 0 } = {}) {
     };
     const h = seated ? CAFE.person.seatedH : CAFE.person.h;
     const p = new Painter(CAFE.person.w, h);
-    (seated ? paintSeated : paintStanding)(p, look);
+    if (seated) paintSeated(p, look);
+    else if (walking) paintWalking(p, look, step);
+    else paintStanding(p, look);
     const sprite = p.sprite();
     return dir === 1 ? sprite : mirror(sprite);
   });

@@ -5,7 +5,13 @@
 // rewrite. `appType: 'mpa'` makes the dev server honest about it: an unknown path is a 404
 // instead of a silent fallback to the hub. `base: './'` still keeps `dist/` portable to any
 // subfolder, and the menu computes its links from each page's own depth.
+//
+// `agentsPlugin` is the dev-only door to the live Pi agents (S28/A1): the browser cannot read `~/.pi`, so the
+// server does it and serves one snapshot at `/api/agents`.
+import agentsPlugin from './tools/agents-plugin.mjs';
+
 export default {
+  plugins: [agentsPlugin()],
   appType: 'mpa',
   base: './',
   server: { port: 5173, open: false },

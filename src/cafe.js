@@ -35,6 +35,9 @@ import { PARK, parkSprite, parkAnimations } from './next/park.js';
 import { GROUND, groundSprite } from './next/ground.js';
 import { paintSkyBase, paintSkyOver, skyAnimations } from './next/sky.js';
 import { shadowSheet, glowSheet, lightFor } from './next/light.js';
+import { AGENTS, fetchAgents, staticSnapshot } from './next/agents.js';
+import { planCast } from './next/cast.js';
+import { walkers } from './next/npc.js';
 
 const TILE_PX = 16;
 const canvas = document.getElementById('scene');
@@ -60,19 +63,18 @@ const frozen = params.get('anim') === '0' || reducedMotion;
 let clock = Number(params.get('sim')) || 0;
 
 const layout = cafeLayout();
-// the six people at the three tables, two per pane: the ground floor is a cafe with six
-// people in it, and that is the count the window has to show without a zoom
-const seated = layout.tables.flatMap((group, i) => [
-  { ...group.left, pose: 'seat', seed: i * 2 },
-  { ...group.right, pose: 'seat', seed: i * 2 + 1 },
-]);
-const building = cafeSprite({ people: seated });
+// The café's people are the live agents and nobody else (A2): what used to be six diners baked into the window is
+// now whoever the snapshot sits at one of these tables. `cafeSprite` composites them INSIDE the window, before
+// the glass tint and the bars, which is the only way a person behind a pane is drawn correctly.
+let building = cafeSprite();
+const seated = [];
 // the clothesline's wire: a still thing that cannot live in the building's sprite, because the
 // sprite's outline pass thickens a one px line to three. Its own one px sprite is blitted over the
 // café right after it, at the box the layout hands out, so the wire is a wire and not a tube
 const wire = wireSprite();
 const wireAt = layout.clothesline.wire;
-const standing = personSprite({ pose: 'stand', facing: 1, seed: 2 });
+// nobody walks the pavement on their own any more: the person outside the door used to be baked in
+const standing = null;
 // the standing person's column: the middle of the 16 px brick pier between the door and the
 // window, a pixel in from each end, so their 30 art px can be read against brick and the door
 // and never against the glazing — someone standing by the cafe door, not a diner behind it
@@ -250,9 +252,7 @@ function paintStill(view) {
   // glass: their feet are on the ground line the building's own bottom row sits on, so their
   // 30 art px are measured from the same line as the six diners' 26
   const feet = groundY;
-  ctx.fillStyle = rgba(C.ink, 0.38);
-  ctx.fillRect(STAND_CLEAR_X - 1, feet - 1, standing.w + 2, 2);
-  ctx.drawImage(standing.canvas, STAND_CLEAR_X, feet - standing.h);
+  void feet;
 
   ctx.restore();
 
@@ -307,6 +307,10 @@ function paintStill(view) {
     still = stillCanvas;
   }
   streetGroundY = groundY;
+  // the cast is planned against the street as it was just measured, and only when the agents change: a plan
+  // rebuilt every frame would make everybody restart their walk
+  worldNow = { street, groundY };
+  applySnapshot();
   // where each block's animated coordinates start: the café's own bottom row, and the park's. No
   // element carries a page coordinate, so a block can move and its animations move with it.
   parkOrigin = park ? { x: parkBlock.x, y: groundY - park.h } : { x: 0, y: groundY };
@@ -321,6 +325,73 @@ function paintStill(view) {
 }
 
 // One frame: the still, then the moving parts. Six blits and nothing else.
+// The agents on a clock, never on a frame (A5): one read every couple of seconds, and the plan is only rebuilt
+// when a label, a state or a set of ids actually changed — otherwise every poll would send everybody back to the
+// lift.
+function signatureOf(snap) {
+  return snap.agents.map((a) => `${a.id}:${a.state}`).join('|');
+}
+
+// The café's occupants, in the layout's own coordinates: only the ones who have arrived and are sitting down,
+// because a walking person inside a cached sprite would be a person who never moves.
+function seatedInCafe(plan) {
+  if (!plan || !worldNow) return [];
+  const block = worldNow.street.blocks.find((b) => b.kind === 'cafe');
+  if (!block) return [];
+  const top = worldNow.groundY - layout.h;
+  return plan.cast
+    .filter((npc) => npc.place === 'cafe' && npc.kind === 'seat')
+    .map((npc) => ({
+      x: npc.x - block.x,
+      y: npc.y - top,
+      pose: 'seat',
+      facing: npc.facing ?? 1,
+      behind: npc.behind !== false,
+      seed: Math.round(npc.x) % 7,
+    }));
+}
+
+function applySnapshot() {
+  if (!worldNow) return;
+  const plan = planCast(agentsSnap, worldNow);
+  const sig = signatureOf(agentsSnap);
+  if (!castPlan || sig !== castSignature) {
+    // the plan being replaced is what makes a change of state a journey: whoever kept their id travels from
+    // where they were, walks to the lift and rides it (A4b)
+    castPlanPrev = castPlan;
+    castPlan = plan;
+    castSignature = sig;
+    castAt = clock;
+    // the café is re-composited with its new occupants; its sprite is cached by the people, so this is only
+    // expensive when somebody actually sat down or left
+    building = cafeSprite({ people: seatedInCafe(castPlan) });
+  }
+}
+
+let castSignature = null;
+
+async function pollAgents() {
+  const snap = await fetchAgents();
+  agentsSnap = snap;
+  applySnapshot();
+  draw();
+}
+
+function drawCast(ctx) {
+  if (!castPlan) return;
+  for (const walker of walkers(castPlan, worldNow, { clock, planAt: castAt, previous: castPlanPrev })) {
+    const { npc } = walker;
+    // in the cabin: nobody is drawn, which is the whole point of a lift
+    if (walker.hidden) continue;
+    // a person sitting in the café is composited inside the café's own sprite, behind its glass: drawing them
+    // again here would put them in front of the window
+    if (npc.place === 'cafe' && npc.kind === 'seat' && walker.arrived) continue;
+    const sprite = personSprite({ pose: walker.pose, facing: walker.facing, seed: walker.seed, phase: walker.phase });
+    // the feet go on the row the cast gave: the sprite is 14 wide with a pixel of margin a side
+    ctx.drawImage(sprite.canvas, walker.x - Math.round(sprite.w / 2), walker.y - sprite.h + 1);
+  }
+}
+
 function draw() {
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
@@ -342,6 +413,8 @@ function draw() {
     }
   }
   ctx.drawImage(still, 0, 0);
+  // the people: the agents' cast, over the street and under the little moving things
+  drawCast(ctx);
   // each element names the block its coordinates belong to, and the café is the default: its four
   // keep climbing from the building's own bottom row exactly as they did. A painted y only has to
   // climb from its origin, so the fan lands in the housing its sprite cut, the smoke on the flue's
@@ -362,6 +435,12 @@ let still = null;
 let skyBase = null;
 let skyOver = null;
 let skyAnimated = [];
+// the live agents: one snapshot on a clock (A5), the plan made from it, and the clock when it was adopted
+let worldNow = null;
+let agentsSnap = staticSnapshot();
+let castPlan = null;
+let castPlanPrev = null;
+let castAt = 0;
 let streetGroundY = 0;
 let animated = [];
 let parkOrigin = { x: 0, y: 0 };
@@ -395,6 +474,12 @@ function tick(now) {
 
 window.addEventListener('resize', layoutPage);
 layoutPage();
+
+// the agents are asked for on a clock, and the first answer arrives without waiting for one
+void pollAgents();
+setInterval(() => {
+  void pollAgents();
+}, AGENTS.pollMs);
 
 // frozen or paused, the one frame is the whole page — which is what a capture wants
 if (!frozen && !startPaused) {
