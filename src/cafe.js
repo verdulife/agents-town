@@ -298,7 +298,9 @@ function paintStill(view) {
       lctx.globalAlpha = 1;
     }
     lctx.globalCompositeOperation = 'lighter';
-    lctx.drawImage(glowSheet({ w, h, groundY, street, time: sky.name, rooms }).canvas, 0, 0);
+    // where the road starts, so the reflections land on the water and not on the pavement
+    const roadTop = groundY + GROUND.contact + GROUND.pave + GROUND.kerb + GROUND.gutter;
+    lctx.drawImage(glowSheet({ w, h, groundY, street, time: sky.name, rooms, roadTop }).canvas, 0, 0);
     lctx.globalCompositeOperation = 'source-over';
     still = lit;
   } else {

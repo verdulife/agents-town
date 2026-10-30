@@ -219,6 +219,19 @@ check('a lit room throws its light on the wall around it, and not on its own ins
   assert(inside(night) === 0, `the room's own inside is lit by the halo (${inside(night).toFixed(1)})`);
 });
 
+check('the road reflects the rooms at night and is dry at noon', () => {
+  const rooms = [{ kind: 'cafe', x: 40, y: 100, w: 90, h: 40 }];
+  const roadTop = GROUNDY + 28;
+  const night = light.glowSheet({ w: W, h: H, groundY: GROUNDY, street: STREET, time: 'night', rooms, roadTop });
+  const noon = light.glowSheet({ w: W, h: H, groundY: GROUNDY, street: STREET, time: 'day', rooms, roadTop });
+  // the stub the light lands on: the dashes further down are stepped and a sample between them is a gap
+  const wet = (spr) => lumAt(spr, 85, roadTop + 1);
+  assert(wet(night) > 0, 'the room leaves no reflection on the road at night');
+  assert(wet(noon) < wet(night) / 3, `the road is ${wet(noon).toFixed(1)} at noon and ${wet(night).toFixed(1)} at night`);
+  // and the reflection stays on the water: the pavement above it is the pool's business, not this one's
+  assert(lumAt(night, 85, roadTop - 6) === 0, 'the reflection is painted on the pavement');
+});
+
 check('the same call paints the same maps', () => {
   const a = light.shadowSheet({ w: W, h: H, groundY: GROUNDY, street: STREET, time: 'dusk' });
   const b = light.shadowSheet({ w: W, h: H, groundY: GROUNDY, street: STREET, time: 'dusk' });

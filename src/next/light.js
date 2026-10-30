@@ -21,8 +21,9 @@
 // construction. A radial gradient at this size is a smudge, and the palette's rule for the whole scene is
 // that a falloff is a step.
 //
-// What is here is the ground and the rooms. The wet road's reflections are still painted inside ground.js with
-// fixed tones: they are the last thing this contract does not own.
+// Everything the street's light does now lives here: the ambient, the shadows, the pools on the pavement, the
+// ring on the wall around a lit room and the same light lying on the wet road. `ground.js` keeps the water and
+// nothing else, so a window at noon cannot still be reflecting at midnight.
 //
 // Deterministic: fixed seed, no clock, no Math.random, no colour literal. The moment is the palette's four
 // names; a real hour would only have to pick a weight between two of them.
@@ -55,6 +56,9 @@ export const LIGHT = {
   // the halo a lit room throws on the wall around it: one px per band, three bands, so the light dies on the
   // brick instead of ending at a line
   room: { reach: [1, 2, 3], alpha: 0.16 },
+  // the same rooms' light lying on the wet road: a stub where it lands and then wide flat dashes stepping
+  // down and out, because a vertical column in a 44-row road reads as something hanging off the kerb
+  reflect: { rows: 26, wide: 13, alpha: 0.42, step: 3 },
   seed: 7307,
 };
 
@@ -138,6 +142,34 @@ function paintRoomGlow(p, { rooms, time }) {
   }
 }
 
+// The rooms' light on the wet road. Below the street line and only below it: what a light does to asphalt is a
+// reflection of the water, not a shape of its own. Weighted by `spare`, so noon is dry tarmac and midnight is a
+// street of lamps.
+function paintRoadReflections(p, { rooms, time, roadTop, bottom }) {
+  const spec = lightFor(time);
+  const R = LIGHT.reflect;
+  const strength = spec.spare;
+  if (strength <= 0.25 || roadTop === null) return;
+  const tone = C[spec.poolTone] ?? C.lampWarm;
+  for (const room of rooms) {
+    const cx = room.x + Math.round(room.w / 2);
+    const seed = room.x * 7 + room.y;
+    // the stub where the light lands on the water
+    for (let r = 0; r < 4; r++) {
+      p.hline(cx - 1, roadTop + r, 3, rgba(tone, R.alpha * strength * (0.8 - r * 0.15)));
+    }
+    // and the light broken across the wet, wide and flat, stepping down as the road comes nearer
+    let y = 4;
+    while (y < R.rows && roadTop + y < bottom) {
+      const near = y / R.rows;
+      const dashW = Math.max(3, Math.round(R.wide * (0.45 + near * 1.1)));
+      const wobble = Math.round(Math.sin((y + seed) * 0.7) * 2);
+      p.hline(cx - Math.round(dashW / 2) + wobble, roadTop + y, dashW, rgba(tone, R.alpha * strength * (0.5 - near * 0.3)));
+      y += R.step;
+    }
+  }
+}
+
 export function shadowSheet({ w, h, groundY, street, time = 'dusk' }) {
   const width = Math.max(1, Math.round(w));
   const rows = Math.max(1, Math.round(h));
@@ -149,14 +181,15 @@ export function shadowSheet({ w, h, groundY, street, time = 'dusk' }) {
   });
 }
 
-export function glowSheet({ w, h, groundY, street, time = 'dusk', rooms = [] }) {
+export function glowSheet({ w, h, groundY, street, time = 'dusk', rooms = [], roadTop = null }) {
   const width = Math.max(1, Math.round(w));
   const rows = Math.max(1, Math.round(h));
-  const key = `glow|${width}|${rows}|${groundY}|${time}|${street.blocks.map((b) => `${b.kind}${b.x}${b.w}`).join(',')}|${rooms.map((r) => `${r.x},${r.y},${r.w},${r.h}`).join(';')}`;
+  const key = `glow|${width}|${rows}|${groundY}|${roadTop}|${time}|${street.blocks.map((b) => `${b.kind}${b.x}${b.w}`).join(',')}|${rooms.map((r) => `${r.x},${r.y},${r.w},${r.h}`).join(';')}`;
   return cacheSprite(cache, key, () => {
     const p = new Painter(width, rows);
     paintPools(p, { w: width, groundY, h: rows, street, time });
     paintRoomGlow(p, { rooms, time });
+    paintRoadReflections(p, { rooms, time, roadTop, bottom: rows });
     return p.sprite();
   });
 }

@@ -1045,3 +1045,22 @@ cuarto), `sky:check` 10/10, `ground:check` 9/9, `park:check` 15/15, `build` limp
 
 Última deuda de la fase 2: los reflejos del asfalto, que siguen pintados en `ground.js` con tonos fijos y por
 tanto insinúan ventanas encendidas a mediodía. Es la siguiente y cierra el sistema.
+
+L48: the light, phase 2 closed — the wet road is the light's too. `ground.js` painted the street's reflections
+with fixed palette tones, so at noon the asphalt still implied lit windows. They are gone from the ground: what
+stays there is the water itself (its value, the sky's bands in its first rows, the wear, the tar patch, the
+manhole) and the reflections moved to `light.js`, weighted by the same `spare` that spares the rooms — noon is
+dry tarmac, midnight is a street of lamps.
+
+Shape, which cost four attempts in the ground module and is worth keeping: a stub where the light lands, and then
+the light broken across the wet into wide flat dashes that step down and widen as the road comes nearer. A
+vertical column in a 44-row road reads as something hanging off the kerb, not as a reflection.
+
+The page now hands the light the one number it could not know: `roadTop`, so a reflection lands on the water and
+never on the pavement. With that, **everything the street's light does lives in one contract** — ambient,
+shadows, the pools on the pavement, the ring around a lit room and its reflection — and `ground.js` keeps the
+water and nothing else.
+
+Verified: `light:check` **11/11** (the road reflects at night and is dry at noon, and the reflection never lands
+on the pavement), `ground:check` 9/9, `sky:check` 10/10, `park:check` 15/15, `build` limpio, y los cuatro
+momentos renderizados: a mediodía la calzada está seca, de noche lleva las luces de la calle.

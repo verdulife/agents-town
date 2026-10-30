@@ -97,14 +97,6 @@ const MAT = {
     void: mix(C.ink, C.ink2, 0.25),
     bar: mix(C.metal, C.ink, 0.6),
   },
-  // the lights the street already has, as reflections: the café's two windows and its door lamp,
-  // the offices' panes, the gym's brand screen
-  light: {
-    window: mix(C.lampWarm, C.brand, 0.28),
-    door: mix(C.lamp, C.glassLit, 0.4),
-    pane: mix(C.lampWarm, C.glassLitSoft, 0.4),
-    brand: mix(C.brand, C.brandLite, 0.2),
-  },
   moss: mix(C.grassDark, C.ink, 0.28),
   leaf: mix(C.wood, C.woodDark, 0.4),
 };
@@ -207,27 +199,6 @@ function paintKerb(p, w, y, doorX) {
 
 // ------------------------------------------------------------------ road
 
-// One wet streak: vertical, narrow, broken into runs by the wet, and it fades as it goes — the
-// shape a lit window makes on asphalt at this hour, and the thing the reference is mostly made of.
-function paintReflection(p, cx, y0, rows, wide, tone, alpha, seed = 0) {
-  const rng = makeRng(GROUND.seed + seed * 37);
-  // A light on wet asphalt in a band this shallow: a stub of it where it lands, and then the light
-  // broken across the water into wide flat dashes that step down and out as the road comes nearer.
-  // A vertical column — the obvious way to draw a reflection — reads as something hanging off the
-  // kerb in 34 rows, which is what three attempts at it proved.
-  for (let r = 0; r < 4; r++) {
-    p.hline(cx - 1, y0 + r, 3, rgba(tone, alpha * (0.85 - r * 0.16)));
-  }
-  let y = 4;
-  while (y < rows - 1) {
-    const near = y / rows;
-    const dashW = Math.max(3, Math.round(wide * (0.45 + near * 1.15)));
-    const dx = cx - Math.round(dashW / 2) + Math.round((rng() - 0.5) * 6);
-    p.hline(dx, y0 + y, dashW, rgba(tone, alpha * (0.52 - near * 0.3)));
-    y += 3 + Math.floor(rng() * 3);
-  }
-}
-
 // The road: one cold value, the sky in its first rows, the street's own lights lying down it, and
 // the few accidents a street has. Every streak starts under the block that owns the light.
 function paintRoad(p, w, y0, rows, sky, blocks) {
@@ -245,34 +216,9 @@ function paintRoad(p, w, y0, rows, sky, blocks) {
     const y = y0 + 6 + Math.round(rng() * (Math.min(rows, G.road) - 8));
     p.hline(x, y, 1 + Math.round(rng() * 2), rgba(MAT.road.wear, 0.07 + rng() * 0.08));
   }
-  // the lights, block by block: the café is the warmest thing on the street, the offices have the
-  // most panes, the gym is the only one whose light is its brand
-  const S = G.streak;
-  // the two rows under each lit block, warmer: what the wet road takes before any reflection is
-  // drawn. Two rows only — a band of it reads as a brown stripe painted on the tarmac
-  for (const block of blocks) {
-    if (block.kind === 'alley' || block.kind === 'park') continue;
-    const tone = block.kind === 'gym' ? MAT.light.brand : block.kind === 'cafe' ? MAT.light.window : MAT.light.pane;
-    p.rect(block.x, y0 + 1, block.w, 1, rgba(tone, 0.13));
-    p.rect(block.x, y0 + 2, block.w, 1, rgba(tone, 0.06));
-  }
-  for (const block of blocks) {
-    if (block.kind === 'alley' || block.kind === 'park') continue;
-    if (block.kind === 'cafe') {
-      // the two windows and the door lamp over the entrance, which is the strongest single light
-      paintReflection(p, block.x + 58, y0 + 2, S.rows, 12, MAT.light.window, S.alpha, 1);
-      paintReflection(p, block.x + 132, y0 + 3, S.rows - 4, 11, MAT.light.window, S.alpha * 0.9, 2);
-      paintReflection(p, block.x + 28, y0 + 1, S.rows + 6, 7, MAT.light.door, S.alpha * 1.15, 3);
-      continue;
-    }
-    const count = block.kind === 'offices' ? 6 : 3;
-    const tone = block.kind === 'gym' ? MAT.light.brand : MAT.light.pane;
-    const alpha = block.kind === 'gym' ? S.alpha * 0.75 : S.alpha * 0.6;
-    for (let i = 0; i < count; i++) {
-      const cx = block.x + Math.round((block.w * (i + 0.5)) / count);
-      paintReflection(p, cx, y0 + 2, S.rows - i, block.kind === 'offices' ? 8 : 10, tone, alpha, 10 + i);
-    }
-  }
+  // the street's own lights on the wet road are NOT painted here any more: they are the light's business
+  // (src/next/light.js), so that a window at noon cannot still be reflecting at midnight. What stays in this
+  // module is the water itself — its value, the sky's bands in its first rows, the wear and the accidents
   // the tar patch: a long repair, darker, with one lit edge so it reads as material and not a hole
   const px = Math.round(w * 0.62);
   p.rect(px, y0 + 15, 44, 6, MAT.road.patch);
