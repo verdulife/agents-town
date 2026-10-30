@@ -21,10 +21,8 @@
 // construction. A radial gradient at this size is a smudge, and the palette's rule for the whole scene is
 // that a falloff is a step.
 //
-// What is deliberately not here yet: the light falling on the FACADES (it would need each module to hand
-// over its glass as a rectangle and its rooms as sources, and that is the next pass, not this one) and the
-// wet road's reflections, which are still painted inside ground.js with fixed tones. Those are the two
-// things `L` will own when the modules declare their lights instead of painting them.
+// What is here is the ground and the rooms. The wet road's reflections are still painted inside ground.js with
+// fixed tones: they are the last thing this contract does not own.
 //
 // Deterministic: fixed seed, no clock, no Math.random, no colour literal. The moment is the palette's four
 // names; a real hour would only have to pick a weight between two of them.
@@ -54,6 +52,9 @@ export const LIGHT = {
   bands: 3, // every shape is painted as three nested bands
   shadow: { reach: 0.34, depth: 9, alpha: 0.5 }, // reach: share of a block's height that the shadow takes
   pool: { rows: 11, spread: 0.72, alpha: 0.2 },
+  // the halo a lit room throws on the wall around it: one px per band, three bands, so the light dies on the
+  // brick instead of ending at a line
+  room: { reach: [1, 2, 3], alpha: 0.16 },
   seed: 7307,
 };
 
@@ -112,6 +113,31 @@ function paintPools(p, { w, groundY, h, street, time }) {
   }
 }
 
+// The halo a lit room throws on the wall around it: a ring, three bands deep, outside the rectangle and never
+// inside it (the interior is already its own light). Additive, warm, and weaker by day — a window at noon is
+// brighter than the brick for the same reason it is at midnight, only less so.
+function paintRoomGlow(p, { rooms, time }) {
+  const spec = lightFor(time);
+  const R = LIGHT.room;
+  const strength = spec.spare; // the same hour that spares the room is the hour the room is worth lighting
+  if (strength <= 0.2) return;
+  const tone = C[spec.poolTone] ?? C.lampWarm;
+  for (const room of rooms) {
+    R.reach.forEach((reach, i) => {
+      const a = R.alpha * strength * (1 - i * 0.3);
+      const x0 = room.x - reach;
+      const y0 = room.y - reach;
+      const w = room.w + reach * 2;
+      const h = room.h + reach * 2;
+      // the ring: four thin rects, one band each, so the inside of the room is untouched
+      p.rect(x0, y0, w, 1, rgba(tone, a));
+      p.rect(x0, y0 + h - 1, w, 1, rgba(tone, a));
+      p.vline(x0, y0, h, rgba(tone, a));
+      p.vline(x0 + w - 1, y0, h, rgba(tone, a));
+    });
+  }
+}
+
 export function shadowSheet({ w, h, groundY, street, time = 'dusk' }) {
   const width = Math.max(1, Math.round(w));
   const rows = Math.max(1, Math.round(h));
@@ -123,13 +149,14 @@ export function shadowSheet({ w, h, groundY, street, time = 'dusk' }) {
   });
 }
 
-export function glowSheet({ w, h, groundY, street, time = 'dusk' }) {
+export function glowSheet({ w, h, groundY, street, time = 'dusk', rooms = [] }) {
   const width = Math.max(1, Math.round(w));
   const rows = Math.max(1, Math.round(h));
-  const key = `glow|${width}|${rows}|${groundY}|${time}|${street.blocks.map((b) => `${b.kind}${b.x}${b.w}`).join(',')}`;
+  const key = `glow|${width}|${rows}|${groundY}|${time}|${street.blocks.map((b) => `${b.kind}${b.x}${b.w}`).join(',')}|${rooms.map((r) => `${r.x},${r.y},${r.w},${r.h}`).join(';')}`;
   return cacheSprite(cache, key, () => {
     const p = new Painter(width, rows);
     paintPools(p, { w: width, groundY, h: rows, street, time });
+    paintRoomGlow(p, { rooms, time });
     return p.sprite();
   });
 }

@@ -1030,3 +1030,18 @@ rendered again — the offices' floors and the café's window read as lit volume
 
 Still owed by phase 2: the light landing on the FAÇADES (the café's window on the alley's wall) and the wet
 road's reflections, which are still painted inside `ground.js` with fixed tones.
+
+L47: the light, phase 2 second slice — the glass lights the wall around it. Every lit room throws a ring of warm
+light on the masonry around it: three bands of one pixel, outside the rectangle and never inside it (the
+interior is already its own light), additive, and weighted by the same `spare` that spares the room — porque la
+hora que perdona el cuarto es la hora en que el cuarto merece iluminar. A mediodía el anillo casi no existe; de
+noche se ve sobre el ladrillo.
+
+Los rectángulos son los mismos que ya lee `streetRooms` (`L46`): una sola medida, dos consumidores — el que
+perdona el interior y el que enciende la pared — así que no pueden separarse.
+
+Verified: `light:check` **10/10** (el anillo ilumina la pared de noche y no de día, y no toca el interior del
+cuarto), `sky:check` 10/10, `ground:check` 9/9, `park:check` 15/15, `build` limpio.
+
+Última deuda de la fase 2: los reflejos del asfalto, que siguen pintados en `ground.js` con tonos fijos y por
+tanto insinúan ventanas encendidas a mediodía. Es la siguiente y cierra el sistema.

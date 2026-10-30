@@ -288,16 +288,17 @@ function paintStill(view) {
     // the lit rooms keep their own light: the unlit pixels of the street are pasted back inside each room at
     // the moment's `spare`, so a room at midnight is a lamp in a dark street and not another grey wall
     const spare = lightFor(sky.name).spare;
+    const rooms = streetRooms(street, groundY);
     if (spare > 0.02) {
       lctx.globalCompositeOperation = 'source-over';
       lctx.globalAlpha = spare;
-      for (const room of streetRooms(street, groundY)) {
+      for (const room of rooms) {
         lctx.drawImage(stillCanvas, room.x, room.y, room.w, room.h, room.x, room.y, room.w, room.h);
       }
       lctx.globalAlpha = 1;
     }
     lctx.globalCompositeOperation = 'lighter';
-    lctx.drawImage(glowSheet({ w, h, groundY, street, time: sky.name }).canvas, 0, 0);
+    lctx.drawImage(glowSheet({ w, h, groundY, street, time: sky.name, rooms }).canvas, 0, 0);
     lctx.globalCompositeOperation = 'source-over';
     still = lit;
   } else {

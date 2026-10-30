@@ -208,6 +208,17 @@ check('no pool under the alley or the park, which have no glass of their own', (
   assert(lumAt(glow, 445, GROUNDY + 1) === 0, 'the park lights its pavement: its lamp is not this pass');
 });
 
+check('a lit room throws its light on the wall around it, and not on its own inside', () => {
+  const rooms = [{ kind: 'offices', x: 200, y: 100, w: 60, h: 30 }];
+  const night = light.glowSheet({ w: W, h: H, groundY: GROUNDY, street: STREET, time: 'night', rooms });
+  const noon = light.glowSheet({ w: W, h: H, groundY: GROUNDY, street: STREET, time: 'day', rooms });
+  const wall = (spr) => lumAt(spr, 198, 110);
+  const inside = (spr) => lumAt(spr, 230, 115);
+  assert(wall(night) > wall(noon), `the wall is ${wall(night).toFixed(1)} at night and ${wall(noon).toFixed(1)} at noon`);
+  assert(wall(night) > 0, 'the room throws no light at all');
+  assert(inside(night) === 0, `the room's own inside is lit by the halo (${inside(night).toFixed(1)})`);
+});
+
 check('the same call paints the same maps', () => {
   const a = light.shadowSheet({ w: W, h: H, groundY: GROUNDY, street: STREET, time: 'dusk' });
   const b = light.shadowSheet({ w: W, h: H, groundY: GROUNDY, street: STREET, time: 'dusk' });
