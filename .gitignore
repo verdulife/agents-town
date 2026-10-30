@@ -8,3 +8,6 @@ dist/
 .engram/*.chunk
 docs/memory/.obsidian/
 docs/memory/engram/.engram-sync-state.json
+
+# a stray cache directory produced by an empty env var, not part of the town
+undefined/
