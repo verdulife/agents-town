@@ -158,3 +158,25 @@ like `idle`, and that the fallback order still contains every leisure place, so 
 gym. Plus the two older rules adjusted to ask `homesFor` instead of the room table.
 
 Owed and unchanged: the lift's own art (T4) and the rooms' interactions (T5).
+
+L8: closing the day. Built, in order: T1 the source (the bar's own inference behind `/api/agents`), T2 the cast
+(seats harvested from the furniture), T3 the walk (a third pose, two frames, journeys on the fixed clock), T6 the
+café's people are the cast and nobody else, T8 a change of state is a journey (walk to the lift, out of sight for
+the ride, out on the new floor), T9 an idle or unknown agent chooses between the café, the gym and the park.
+`checking` was moved to the working floor.
+
+Owed, in the order they should be done:
+- **T4** the lift's own art: doors opening and closing and the cabin moving between floors. Until it exists the
+  journey is told by the person and not by the building.
+- **T5** the rooms' interactions: a desk, a meeting, coffee, exercise, a cigarette on the roof, the bench — and
+  the glass veil re-applied over a person who is inside an office, because a block is one opaque sprite and the
+  cast is drawn over it.
+- **T7** the lift's invariants, with T4.
+
+Native review, for the record: two candidates were offered and both were declined at the host
+(`consent-declined-this-candidate`), the second flagged high risk on the evidence "code that starts other
+processes in tools/agents-source.py". No lineage was created and nothing was mutated either time. A decline is
+per candidate: the work is committed on `main` and delivered by ordinary repository policy.
+
+State at close: `agents:check` 17/17, `sky:check` 10/10, `ground:check` 9/9, `park:check` 15/15, `light:check`
+11/11, `build` clean, and the dev server on :5174 with `/api/agents` serving the live session.
