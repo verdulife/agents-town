@@ -124,6 +124,7 @@ globalThis.document = {
 const here = dirname(fileURLToPath(import.meta.url));
 const SOURCE = join(here, '..', 'src', 'next', 'light.js');
 const light = await import('../src/next/light.js');
+const streetApi = await import('../src/next/street.js');
 
 const W = 480;
 const H = 260;
@@ -213,6 +214,30 @@ check('the same call paints the same maps', () => {
   const x = dataOf(a);
   const y = dataOf(b);
   for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) throw new Error('two identical calls differ');
+});
+
+check('a lit room is spared more at night than at noon, and never less than nothing', () => {
+  const order = ['night', 'dusk', 'dawn', 'day'];
+  const spare = order.map((t) => light.lightFor(t).spare);
+  for (let i = 0; i < spare.length; i++) {
+    assert(spare[i] >= 0 && spare[i] <= 1, `${order[i]}: spare is ${spare[i]}`);
+  }
+  assert(spare[0] > spare[3] + 0.4, `night spares ${spare[0]} and day ${spare[3]}: the rooms are not spared at night`);
+  assert(spare[3] < 0.3, `day spares ${spare[3]}: at noon a room is not a lamp`);
+});
+
+check('the street hands the light the rooms it must spare, and they sit inside their own blocks', () => {
+  const { streetLayout, streetRooms } = streetApi;
+  const L = streetLayout(960, 470, 399);
+  const rooms = streetRooms(L, 399);
+  assert(rooms.length >= 6, `${rooms.length} rooms: the offices alone have four floors`);
+  for (const room of rooms) {
+    const block = L.blocks.find((b) => b.kind === room.kind);
+    assert(block, `a room of kind ${room.kind} has no block`);
+    assert(room.x >= block.x && room.x + room.w <= block.x + block.w + 1, `a ${room.kind} room is outside its block`);
+    assert(room.y >= 0 && room.y + room.h <= 399, `a ${room.kind} room is outside the street's rows`);
+    assert(room.h >= 8, `a ${room.kind} room is ${room.h} rows tall: too thin to be a room`);
+  }
 });
 
 check('light.js holds no colour literal, no Math.random and reads no clock', () => {

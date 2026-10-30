@@ -43,10 +43,13 @@ export const LIGHT = {
   // Per moment: how much of the street's own colour survives (1 = untouched, 0.5 = half the value), the
   // direction the shadows fall in art px per row of height, and how strong the glass is on the pavement.
   moments: {
-    night: { ambient: 0.46, cast: -0.09, pool: 1, poolTone: 'lamp' },
-    dawn: { ambient: 0.8, cast: 0.16, pool: 0.5, poolTone: 'lampWarm' },
-    day: { ambient: 1, cast: 0.1, pool: 0.18, poolTone: 'glassLit' },
-    dusk: { ambient: 0.72, cast: 0.2, pool: 0.8, poolTone: 'lampWarm' },
+    // `spare` is how much of a lit room keeps its own light through the ambient pass: at noon the street is
+    // already the colour of the sky and a room is not a lamp, so it is spared almost nothing; at night a lit
+    // room is the brightest thing on the street and the ambient has no business darkening it
+    night: { ambient: 0.46, cast: -0.09, pool: 1, poolTone: 'lamp', spare: 0.86 },
+    dawn: { ambient: 0.8, cast: 0.16, pool: 0.5, poolTone: 'lampWarm', spare: 0.6 },
+    day: { ambient: 1, cast: 0.1, pool: 0.18, poolTone: 'glassLit', spare: 0.18 },
+    dusk: { ambient: 0.72, cast: 0.2, pool: 0.8, poolTone: 'lampWarm', spare: 0.7 },
   },
   bands: 3, // every shape is painted as three nested bands
   shadow: { reach: 0.34, depth: 9, alpha: 0.5 }, // reach: share of a block's height that the shadow takes

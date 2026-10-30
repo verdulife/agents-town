@@ -1013,3 +1013,20 @@ Verified: `light:check` **7/7** (white ambient at noon and dark at night, the sh
 buildings and dark at their feet, the shadow falling left at dusk and right at night, the glass brighter at
 night than at noon, no pool under the alley or the park, determinism, palette), and `sky:check` 10/10,
 `ground:check` 9/9, `park:check` 15/15 still green. The four moments rendered offline with the pass on.
+
+L46: the light, phase 2 first slice — the rooms keep their own light. The ambient of the hour multiplies the
+whole street, and inside it the lit rooms were darkening with it: at midnight the offices were a grey wall with
+a lamp in it. Now the page pastes the UNLIT pixels back inside each room at the moment's `spare` — 0.86 at
+night, 0.7 at dusk, 0.6 at dawn and 0.18 at noon, because at noon the street is already the colour of the sky
+and a room is not a lamp.
+
+The rectangles are not measured here: `streetRooms(street, groundY)` reads them from the layouts that own
+them — the café's window, the offices' four glazed floors, the gym's two — and returns them in page
+coordinates. A room measured twice drifts apart from the art, so it is measured once, where the art is.
+
+Verified: `light:check` **9/9** (two new rules: the spare falls from night to noon and never leaves [0,1], and
+every room sits inside its own block and inside the street's rows), `build` clean, and the four moments
+rendered again — the offices' floors and the café's window read as lit volumes in a dark street.
+
+Still owed by phase 2: the light landing on the FAÇADES (the café's window on the alley's wall) and the wet
+road's reflections, which are still painted inside `ground.js` with fixed tones.

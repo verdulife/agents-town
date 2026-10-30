@@ -35,7 +35,7 @@ import { C, mix, rgba } from './palette.js';
 import { drawText, lineWidth } from '../font.js';
 import { CAFE, cafeLayout } from './cafe.js';
 import { ALLEY } from './alley.js';
-import { GYM } from './gym.js';
+import { GYM, gymLayout } from './gym.js';
 import { OFFICES, officesLayout } from './offices.js';
 import { PARK, parkLayout } from './park.js';
 
@@ -166,6 +166,49 @@ export function streetLayout(viewW, viewH = Infinity, availableH = viewH) {
     blocks,
     billboard: { h: GYM.board },
   };
+}
+
+// The rooms behind the glass, in PAGE coordinates, for the lighting pass: a room is a lit volume, and the
+// ambient of the hour must not darken it the way it darkens the street. The layouts already own these
+// rectangles — the café's window, the offices' four glazed floors, the gym's two — so they are read from
+// there and never re-derived here: a room measured twice drifts apart from the art.
+//
+// The alley has no glass and the park's ground is painted by park.js, so neither contributes.
+export function streetRooms(street, groundY) {
+  const rooms = [];
+  const cafe = street.blocks.find((b) => b.kind === 'cafe');
+  const offices = street.blocks.find((b) => b.kind === 'offices');
+  const gym = street.blocks.find((b) => b.kind === 'gym');
+  if (cafe) {
+    const L = cafeLayout();
+    rooms.push({ kind: 'cafe', x: cafe.x + L.glass.x, y: groundY - L.h + L.glass.y, w: L.glass.w, h: L.glass.h });
+  }
+  if (offices) {
+    const L = officesLayout();
+    const top = groundY - L.h;
+    for (const band of L.bands) {
+      rooms.push({
+        kind: 'offices',
+        x: offices.x + L.glass.x,
+        y: top + band.y,
+        w: L.glass.w,
+        h: band.row - band.y + 1,
+      });
+    }
+  }
+  if (gym) {
+    const L = gymLayout();
+    const top = groundY - L.h;
+    for (const glass of [L.groundGlass, L.upperGlass]) {
+      if (!glass) continue;
+      const x = glass.x ?? L.windowX;
+      const y = glass.y ?? glass.top ?? 0;
+      const w = glass.w ?? L.windowW;
+      const h = glass.h ?? glass.rows ?? 0;
+      if (h > 0) rooms.push({ kind: 'gym', x: gym.x + x, y: top + y, w, h });
+    }
+  }
+  return rooms;
 }
 
 // `CAFE 192x172` · `ALLEY 88` · `OFFICES 4F 302x326` · `PARK 240` — the block's own numbers,

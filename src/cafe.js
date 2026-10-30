@@ -27,14 +27,14 @@ import { computeView, applyView, TARGET_H } from './next/scale.js';
 import { terrainPatch } from './next/terrain.js';
 import { drawText, lineWidth } from './font.js';
 import { CAFE, cafeSprite, cafeLayout, personSprite, cafeAnimations, wireSprite } from './next/cafe.js';
-import { streetLayout, streetReadout, paintBlockLabels } from './next/street.js';
+import { streetLayout, streetReadout, paintBlockLabels, streetRooms } from './next/street.js';
 import { alleySprite } from './next/alley.js';
 import { gymSprite } from './next/gym.js';
 import { officesSprite } from './next/offices.js';
 import { PARK, parkSprite, parkAnimations } from './next/park.js';
 import { GROUND, groundSprite } from './next/ground.js';
 import { paintSkyBase, paintSkyOver, skyAnimations } from './next/sky.js';
-import { shadowSheet, glowSheet } from './next/light.js';
+import { shadowSheet, glowSheet, lightFor } from './next/light.js';
 
 const TILE_PX = 16;
 const canvas = document.getElementById('scene');
@@ -285,6 +285,17 @@ function paintStill(view) {
     lctx.drawImage(shadowSheet({ w, h, groundY, street, time: sky.name }).canvas, 0, 0);
     lctx.globalCompositeOperation = 'destination-in';
     lctx.drawImage(stillCanvas, 0, 0);
+    // the lit rooms keep their own light: the unlit pixels of the street are pasted back inside each room at
+    // the moment's `spare`, so a room at midnight is a lamp in a dark street and not another grey wall
+    const spare = lightFor(sky.name).spare;
+    if (spare > 0.02) {
+      lctx.globalCompositeOperation = 'source-over';
+      lctx.globalAlpha = spare;
+      for (const room of streetRooms(street, groundY)) {
+        lctx.drawImage(stillCanvas, room.x, room.y, room.w, room.h, room.x, room.y, room.w, room.h);
+      }
+      lctx.globalAlpha = 1;
+    }
     lctx.globalCompositeOperation = 'lighter';
     lctx.drawImage(glowSheet({ w, h, groundY, street, time: sky.name }).canvas, 0, 0);
     lctx.globalCompositeOperation = 'source-over';
