@@ -1,8 +1,8 @@
-// The street, as a layout plus what is still massing (S16-S20). The question the prototype
-// exists to answer is whether the cafeteria, the alley, the offices and the gym fit on one screen
-// at the scale the cafeteria was drawn at, and every block reports its own numbers. All four of
-// them are art now: they are drawn by their own modules, and this file places them and prices
-// them.
+// The street, as a layout plus what is still massing (S16-S20, S24). The question the prototype
+// exists to answer is whether the cafeteria, the alley, the offices, the gym and the park fit on
+// one screen at the scale the cafeteria was drawn at, and every block reports its own numbers. All
+// five of them are art now: they are drawn by their own modules, and this file places them and
+// prices them.
 //
 // So every block is built out of the cafeteria's own storey (floor 64 + slab 10, the numbers in
 // CAFE), and nothing here is allowed to invent a smaller floor to make the answer look better.
@@ -14,12 +14,16 @@
 //     sign: the layout only hands it the two flank heights, which are these buildings' own
 //   the offices take their own width now, 302, the sprite's own: the tower is art, and a mass
 //     narrower than its facade would let the gym's bulge take a bite out of it
-//   the gym ends exactly at the view's right limit — S17 allows both ends to touch
+//   the gym keeps its own 240 from now on (S24): it used to absorb the difference up to the
+//     view's right limit, which is what left the bare pavement this street never drew on
+//   the park takes exactly that difference — viewW - 822 — and is a block of its own, with no
+//     floors and with the height its own trees give it (src/next/park.js). It does not exist on a
+//     view of 822 or narrower, and on a view wider than that it is the only thing that grows
 //
 // A tower should read taller than wide, so the offices keep a proportion instead of swallowing
-// every spare pixel; the gym absorbs the difference, which is what makes the two of them always
-// add up to the frame. On a view narrower than the street's own 822, the gym absorbs more than it
-// has and is clipped by the right limit — that is the finding, not an error.
+// every spare pixel; the leftover past the gym's own 240 is the park's, so the blocks still add up
+// to the frame. On a view narrower than the street's own 822, the gym is clipped by the right
+// limit — that is the finding, not an error.
 //
 // A block whose computed height is taller than the view is not an error: it is the
 // finding. It reports `overflow` in pixels and the page draws it clipped.
@@ -33,6 +37,7 @@ import { CAFE, cafeLayout } from './cafe.js';
 import { ALLEY } from './alley.js';
 import { GYM } from './gym.js';
 import { OFFICES, officesLayout } from './offices.js';
+import { PARK, parkLayout } from './park.js';
 
 // One storey, borrowed from the cafeteria on purpose: that is the number being priced.
 const FLOOR_H = CAFE.floorH; // 64
@@ -90,16 +95,22 @@ export function streetLayout(viewW, viewH = Infinity, availableH = viewH) {
 
   // what the offices and the gym share, once the cafeteria and the alley have their width
   const room = width - CAFE.width - ALLEY.w;
-  // the gym ends at the right limit, so it takes whatever the offices did not. The offices are
-  // art now and keep their own 302: on a view narrower than the street's 822 the gym is the one
-  // that gives, and past its own 240 the page clips it.
-  const gymWidth = Math.max(0, room - officesW);
-  const leftover = width - CAFE.width - ALLEY.w - officesW - gymWidth;
+  // the gym is art and keeps its own 240: it gives only when the view cannot hold that much, and
+  // then the page clips it exactly as before. The difference past its own 240 is the park's.
+  const gymWidth = Math.max(0, Math.min(GYM.width, room - officesW));
+  const parkWidth = Math.max(0, room - officesW - gymWidth);
 
   const cafeX = 0;
   const alleyX = cafeX + CAFE.width;
   const officesX = alleyX + ALLEY.w;
   const gymX = officesX + officesW;
+  const parkX = gymX + gymWidth;
+  // the park's height is its own trees' (park.js owns the number). A strip too narrow to hold the
+  // fountain is not a park: no block, no grass, no readout line, and its pixels are reported as
+  // leftover instead — an empty green strip between the gym and the frame edge would be a defect
+  // with a label on it, not a finding
+  const park = parkWidth >= PARK.minW ? parkLayout(parkWidth) : null;
+  const leftover = width - CAFE.width - ALLEY.w - officesW - gymWidth - (park ? parkWidth : 0);
 
   const blocks = [
     makeBlock({ kind: 'cafe', name: 'CAFE', x: cafeX, w: CAFE.width, floors: 2, h: cafeH, availableH: above }),
@@ -136,6 +147,11 @@ export function streetLayout(viewW, viewH = Infinity, availableH = viewH) {
     }),
   ];
 
+  // the fifth block, and only when there is a strip to give it: no parkW, no block, no art
+  if (park) {
+    blocks.push(makeBlock({ kind: 'park', name: 'PARK', x: parkX, w: parkWidth, floors: 0, h: park.h, availableH: above }));
+  }
+
   return {
     viewW: width,
     availableH: Number.isFinite(above) ? above : null,
@@ -144,23 +160,27 @@ export function streetLayout(viewW, viewH = Infinity, availableH = viewH) {
     slabH: SLAB_H,
     storeyH: STOREY_H,
     alleyW: ALLEY.w,
+    parkW: parkWidth,
+    parkMinW: PARK.minW,
     leftover,
     blocks,
     billboard: { h: GYM.board },
   };
 }
 
-// `CAFE 192x172` · `ALLEY 88` · `OFFICES 4F 302x326` — the block's own numbers, shared
-// by the label over its roof and by the readout, so the two can never word it differently.
+// `CAFE 192x172` · `ALLEY 88` · `OFFICES 4F 302x326` · `PARK 240` — the block's own numbers,
+// shared by the label over its roof and by the readout, so the two can never word it differently.
+// The alley and the park have no floors to count, so they print their width alone.
 export function blockSize(b) {
-  if (b.kind === 'alley') return `${b.name} ${b.w}`;
+  if (b.kind === 'alley' || b.kind === 'park') return `${b.name} ${b.w}`;
   return `${b.name}${b.showFloors ? ` ${b.floors}F` : ''} ${b.w}x${b.h}`;
 }
 
-// `CAFE 192x172 FIT` · `ALLEY 88` · `OFFICES 4F 302x326 FIT` — the readout the page
-// prints, built from the layout so it can never disagree with what was drawn.
+// `CAFE 192x172 FIT` · `ALLEY 88` · `OFFICES 4F 302x326 FIT` · `PARK 240` — the readout the page
+// prints, built from the layout so it can never disagree with what was drawn. The alley and the
+// park are places, not buildings: nothing to price against the room above the ground line.
 export function blockSegment(b) {
-  if (b.kind === 'alley') return blockSize(b);
+  if (b.kind === 'alley' || b.kind === 'park') return blockSize(b);
   return `${blockSize(b)} ${b.overflow > 0 ? `OVERFLOW+${b.overflow}` : 'FIT'}`;
 }
 
@@ -173,9 +193,10 @@ export function streetReadout(L) {
 
 // ---------------------------------------------------------------- labels
 
-// Nothing of any block is painted here any more: all four are art now (src/next/cafe.js,
-// alley.js, offices.js and gym.js). The blocks keep their widths, their heights and their
-// readout lines, which is what the layout prices and the labels print.
+// Nothing of any block is painted here any more: all five are art now (src/next/cafe.js,
+// alley.js, offices.js, gym.js and park.js). The blocks keep their widths, their heights and their
+// readout lines, which is what the layout prices and the labels print. The park's label rides on
+// the height its own trees set, so it sits over the crowns and inside the frame.
 
 // One label per block, tiny, above its roof. A block that runs off the top of the frame
 // keeps its label inside it — the clipped mass above is the point being made, and a label

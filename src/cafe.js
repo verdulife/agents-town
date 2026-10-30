@@ -4,10 +4,11 @@
 // the whole street fit?
 //
 // The street is composed, in the order a street reads: the alley first (it is a recess, so what
-// oversails it has to end up in front of it), then the cafeteria, the offices and the gym — all
-// four of them art now — and then the person in front of the cafeteria. Every width comes from
-// streetLayout, which reads the view's own width, and the readout prints the layout back at the
-// bottom right.
+// oversails it has to end up in front of it), then the cafeteria, the offices, the gym and the park
+// — all five of them art now — and then the person in front of the cafeteria. Every width comes
+// from streetLayout, which reads the view's own width, and the readout prints the layout back at the
+// bottom right. The park is the strip past the gym's own 240 (S24): it appears on views wider than
+// the street's 822 and it is not there on narrower ones, where the gym is clipped instead.
 //
 // The page scales itself exactly like the rest of the town: computeView gives the largest
 // integer number of physical pixels per art pixel that keeps TARGET_H on screen, so on a
@@ -21,6 +22,7 @@
 
 import './cafe.css';
 import { C, SKY, mix, rgba } from './next/palette.js';
+import { Painter } from './pixel.js';
 import { computeView, applyView, TARGET_H } from './next/scale.js';
 import { terrainPatch } from './next/terrain.js';
 import { drawText, lineWidth } from './font.js';
@@ -29,6 +31,10 @@ import { streetLayout, streetReadout, paintBlockLabels } from './next/street.js'
 import { alleySprite } from './next/alley.js';
 import { gymSprite } from './next/gym.js';
 import { officesSprite } from './next/offices.js';
+import { PARK, parkSprite, parkAnimations } from './next/park.js';
+import { GROUND, groundSprite } from './next/ground.js';
+import { paintSkyBase, paintSkyOver, skyAnimations } from './next/sky.js';
+import { shadowSheet, glowSheet } from './next/light.js';
 
 const TILE_PX = 16;
 const canvas = document.getElementById('scene');
@@ -45,6 +51,9 @@ const zoom = Math.max(0, Math.round(Number(params.get('zoom')) || 0));
 const startPaused = params.get('pause') === '1';
 // The numbers are a tool, not scenery: hidden by default, back with ?debug=1
 const showMetrics = params.get('debug') === '1';
+// the lighting is the newest thing on the page and the easiest to make a mistake in, so it can be turned
+// off whole with ?light=0 and the scene compared against the plain one
+const lighting = params.get('light') !== '0';
 const reducedMotion =
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const frozen = params.get('anim') === '0' || reducedMotion;
@@ -84,24 +93,6 @@ function groundBand(ctx, kind, seed, x0, y0, w, h) {
   ctx.clip();
   ctx.drawImage(patch.canvas, x0 + Math.round((w - patch.w) / 2), y0 + h - patch.h);
   ctx.restore();
-}
-
-// The sky as a vertical ramp: deep at the top, the horizon colour at the bottom. Four
-// stops make four stripes, so the ramp is interpolated into enough bands that the seam
-// between two of them is never a line you read instead of the sky.
-function paintSky(ctx, w, h, ramp) {
-  if (h <= 0) return;
-  const stops = ramp.steps.map((key) => C[key]);
-  const bands = Math.max(stops.length, Math.min(14, Math.round(h / 26)));
-  for (let i = 0; i < bands; i++) {
-    const t = (i / (bands - 1)) * (stops.length - 1);
-    const from = Math.min(stops.length - 1, Math.floor(t));
-    const to = Math.min(stops.length - 1, from + 1);
-    const y0 = Math.round((h * i) / bands);
-    const y1 = Math.round((h * (i + 1)) / bands);
-    ctx.fillStyle = mix(stops[from], stops[to], t - from);
-    ctx.fillRect(0, y0, w, y1 - y0);
-  }
 }
 
 // The readout: the contract, read straight off CAFE, so the page can never say something
@@ -165,20 +156,49 @@ function paintStill(view) {
   ctx.imageSmoothingEnabled = false;
   const { w, h } = view;
 
-  // the ground: a pavement band and the road under it, sized off the view so the building
-  // keeps the frame at every zoom, with a floor under the pavement's height
-  const paveH = clamp(Math.round(h * 0.055), 6, 34);
-  const roadH = clamp(Math.round(h * 0.11), 10, 64);
-  const groundY = clamp(h - roadH - paveH, layout.h + 4, h);
-  const roadTop = Math.min(h, groundY + paveH);
+  // the ground's own bands, measured in art px and fixed (GROUND, S25): the pavement's two courses,
+  // the kerb, the gutter and the core of the road. The fade below the road takes whatever the frame
+  // has left, so the street's floor keeps its measurements instead of stretching with the window,
+  // and the art pixel stays the same size on every monitor
+  const groundH = GROUND.contact + GROUND.pave + GROUND.kerb + GROUND.gutter + GROUND.road;
+  const groundY = clamp(h - groundH, layout.h + 4, h);
 
-  paintSky(ctx, w, groundY, sky);
-  groundBand(ctx, 'paving', 3, 0, groundY, w, roadTop - groundY);
-  groundBand(ctx, 'asphalt', 11, 0, roadTop, w, h - roadTop);
-
-  // the street, from the view's own width: the cafeteria at the left limit and the gym
-  // ending at the right one, with the alley and the offices taking what is between them
+  // the street, from the view's own width: the cafeteria at the left limit and the gym keeping its
+  // own 240, with the alley, the offices and the park taking what is between them
   const street = streetLayout(w, h, groundY);
+
+  // the sky, painted by sky.js into a still of its own: the ramp, the horizon haze, the city in three
+  // planes and the cirrus. Its own picture because the street's still is opaque, and a drifting cloud
+  // drawn with the street's moving parts would cross the offices — the sky moves behind them
+    // the sky's own features are placed in the band the street leaves visible: everything above the
+  // tallest roof. A cloud or a star painted where a building stands is a cloud nobody sees
+  const clear = Math.max(0, groundY - Math.max(...street.blocks.map((b) => b.h)));
+  // two sky pictures and not one, because the sun passes behind the clouds: the base is the ramp and the
+  // cirrus, the over is the clouds and the landscape in front of them, and between the two the page
+  // draws the sun, the moon and the stars
+  const skyParams = { w, h: groundY, time: sky.name, clear };
+  skyBase = paintSkyBase(new Painter(w, groundY), skyParams).sprite().canvas;
+  skyOver = paintSkyOver(new Painter(w, groundY), skyParams).sprite().canvas;
+  // the street's floor, painted by ground.js at the elevation's own scale: two courses of slabs, the
+  // kerb, the wet road and the dark near edge, with every block's contact shadow and the light of
+  // every lit block on it. One blit, and no terrain tile anywhere in it
+  const ground = groundSprite({
+    w,
+    h: h - groundY,
+    sky: sky.name,
+    blocks: street.blocks,
+    // the one drain the street has stands where the water runs: by the café's door
+    doorX: layout.standX,
+  });
+  ctx.drawImage(ground.canvas, 0, groundY);
+  // the park's ground, over the pavement and inside the park's own span: the terrain catalogue's
+  // grass, laid by the same band helper the rest of the town's floors come from. park.js paints what
+  // stands in the strip and nothing else, so the grass is the page's. It covers the pavement's
+  // courses and their contact rows, and stops at the kerb, which is the street's and not the park's
+  // the park no longer lays a grass band over the pavement: the pavement runs in front of it, unbroken,
+  // and the park is a plot set back behind that line — kerb, grass receding, railing, all of it inside
+  // park.js, which is what gives it the depth the alley has
+  const parkBlock = street.blocks.find((b) => b.kind === 'park');
 
   // everything that stands on the ground is clipped to the canvas: a block too tall for
   // the frame runs off the top, and that clipped bulk is the finding, not an error
@@ -199,8 +219,6 @@ function paintStill(view) {
   // drawn wider than the 192 so the plinth, the string course and the cornice can oversail it:
   // the building's mass still starts exactly at the left limit, and its bands pass in front of
   // the alley's mouth instead of being cut by it
-  ctx.fillStyle = rgba(C.ink, 0.32);
-  ctx.fillRect(0, groundY, layout.w, 3);
   ctx.drawImage(building.canvas, -layout.bleed, groundY - layout.h);
   // 2a. the clothesline's wire, over the café and over its own washing: one px, no outline, so
   // it reads as a wire at 10x instead of as a steel tube. Its box is in the layout's own art
@@ -222,6 +240,12 @@ function paintStill(view) {
   const gym = gymSprite();
   ctx.drawImage(gym.canvas, gymBlock.x, groundY - gym.h);
 
+  // 2d. the park, in the strip the gym no longer absorbs, its bottom row on the same ground line,
+  // so its trees, its fountain and its lamp stand on the grass band laid above. A strip too narrow
+  // for the fountain has no art at all (park.h is 0) and the blit is one transparent row.
+  const park = parkBlock ? parkSprite(parkBlock.w) : null;
+  if (park) ctx.drawImage(park.canvas, parkBlock.x, groundY - park.h);
+
   // 3. the one person on the pavement, in front of the brick pier between the door and the
   // glass: their feet are on the ground line the building's own bottom row sits on, so their
   // 30 art px are measured from the same line as the six diners' 26
@@ -241,34 +265,92 @@ function paintStill(view) {
     drawReadout(ctx, w, h, street);
   }
 
-  still = stillCanvas;
+  // the lighting, composed once per resize and never per frame: the street's still multiplied by the
+  // shadow sheet (white where nothing casts) and then added the pools the glass throws. The SKY is not in
+  // this pass — it is already the light of its own moment and must not be darkened twice
+  if (lighting) {
+    // the street's still is TRANSPARENT above the buildings — the sky is its own picture — so a plain
+    // multiply would turn that transparency black. The order that works: white base, multiply the street
+    // onto it, multiply the shadow sheet, then destination-in with the street again to throw the white
+    // away (keeping the shadows only where the street is), and add the glass on top
+    const lit = document.createElement('canvas');
+    lit.width = w;
+    lit.height = h;
+    const lctx = lit.getContext('2d');
+    lctx.imageSmoothingEnabled = false;
+    lctx.fillStyle = '#ffffff';
+    lctx.fillRect(0, 0, w, h);
+    lctx.globalCompositeOperation = 'multiply';
+    lctx.drawImage(stillCanvas, 0, 0);
+    lctx.drawImage(shadowSheet({ w, h, groundY, street, time: sky.name }).canvas, 0, 0);
+    lctx.globalCompositeOperation = 'destination-in';
+    lctx.drawImage(stillCanvas, 0, 0);
+    lctx.globalCompositeOperation = 'lighter';
+    lctx.drawImage(glowSheet({ w, h, groundY, street, time: sky.name }).canvas, 0, 0);
+    lctx.globalCompositeOperation = 'source-over';
+    still = lit;
+  } else {
+    still = stillCanvas;
+  }
   streetGroundY = groundY;
+  // where each block's animated coordinates start: the café's own bottom row, and the park's. No
+  // element carries a page coordinate, so a block can move and its animations move with it.
+  parkOrigin = park ? { x: parkBlock.x, y: groundY - park.h } : { x: 0, y: groundY };
   // the moving parts, in the order they are drawn: the fan on the flat, the smoke off the flue,
-  // the ball that smoke rises behind, the cat on the parapet. They come from one list, so a
-  // frame is a loop and never a fourth copy of the fan's three lines.
-  animated = cafeAnimations();
+  // the ball that smoke rises behind, the cat on the parapet, and then the park's fountain jet.
+  // They come from one list, so a frame is a loop and never a fourth copy of the fan's three lines.
+  animated = park ? [...cafeAnimations(), ...parkAnimations(parkBlock.w)] : cafeAnimations();
+  // what moves in the sky: the stars, the moon, the two cloud banks, the window groups and the
+  // beacons. They are drawn between the two stills, so they are behind the street and can never
+  // cross a facade
+  skyAnimated = skyAnimations({ w, h: groundY, time: sky.name, clear });
 }
 
-// One frame: the still, then the moving parts. Five blits and nothing else.
+// One frame: the still, then the moving parts. Six blits and nothing else.
 function draw() {
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, view.w, view.h);
+  // the sky in three steps: the ramp, then what belongs BEHIND the clouds (the sun, the moon, the
+  // stars), then the clouds and the landscape over them. After that the street, so no cloud can ever
+  // pass in front of the offices
+  if (skyBase) {
+    ctx.drawImage(skyBase, 0, 0);
+    const behind = (element) => (element.layer ?? 'behind') === 'behind';
+    for (const element of skyAnimated.filter(behind)) {
+      const { sprite, x, y } = element.place(clock, frozen);
+      ctx.drawImage(sprite.canvas, x, y);
+    }
+    ctx.drawImage(skyOver, 0, 0);
+    for (const element of skyAnimated.filter((e) => !behind(e))) {
+      const { sprite, x, y } = element.place(clock, frozen);
+      ctx.drawImage(sprite.canvas, x, y);
+    }
+  }
   ctx.drawImage(still, 0, 0);
-  // the building's own bottom row sits on the ground line, so a painted y only has to climb
-  // from there: the fan lands exactly in the housing its sprite cut, the smoke on the flue's
-  // mouth, the ball over it and the cat's feet on the parapet's coping
-  const top = streetGroundY - layout.h;
+  // each element names the block its coordinates belong to, and the café is the default: its four
+  // keep climbing from the building's own bottom row exactly as they did. A painted y only has to
+  // climb from its origin, so the fan lands in the housing its sprite cut, the smoke on the flue's
+  // mouth, the ball over it, the cat's feet on the parapet's coping and the jet in its bowl.
+  const origins = {
+    cafe: { x: 0, y: streetGroundY - layout.h },
+    park: parkOrigin,
+  };
   for (const element of animated) {
+    const origin = origins[element.origin ?? 'cafe'];
     const { sprite, x, y } = element.place(clock, frozen);
-    ctx.drawImage(sprite.canvas, x, top + y);
+    ctx.drawImage(sprite.canvas, origin.x + x, origin.y + y);
   }
 }
 
 let view = null;
 let still = null;
+let skyBase = null;
+let skyOver = null;
+let skyAnimated = [];
 let streetGroundY = 0;
 let animated = [];
+let parkOrigin = { x: 0, y: 0 };
 
 function layoutPage() {
   const cssW = window.innerWidth;

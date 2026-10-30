@@ -12,7 +12,11 @@
     "smoke": "node tools/smoke.mjs",
     "memory:import": "node tools/engram-import.mjs",
     "terrain:check": "node tools/terrain-check.mjs",
-    "floor:check": "node tools/floor-check.mjs"
+    "floor:check": "node tools/floor-check.mjs",
+    "ground:check": "node tools/ground-check.mjs",
+    "sky:check": "node tools/sky-check.mjs",
+    "light:check": "node tools/light-check.mjs",
+    "park:check": "node tools/park-check.mjs"
   },
   "devDependencies": {
     "vite": "^8.3.5"
