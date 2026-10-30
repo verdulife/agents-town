@@ -7,6 +7,9 @@ const here = new URL('.', import.meta.url);
 const { AGENTS, STATE_ROOM, normaliseSnapshot, staticSnapshot, fetchAgents } = await import(
   new URL('../src/next/agents.js', here).href
 );
+// the cast is imported here, with the rest: two of the checks below (the state table and the static fallback)
+// ask it where a state can be, so it has to exist before the first check runs
+const { planCast, spotsOf, homesFor, LEISURE } = await import(new URL('../src/next/cast.js', here).href);
 
 let failures = 0;
 let checks = 0;
@@ -26,14 +29,18 @@ function assert(cond, message) {
 
 console.log('agents check\n');
 
-check('every state the bar reports has a place in the town', () => {
+check('every state the bar reports has somewhere to be', () => {
   for (const state of AGENTS.states) {
-    const spot = STATE_ROOM[state];
-    assert(spot, `${state} has no place`);
-    assert(['offices', 'roof', 'park', 'cafe', 'gym'].includes(spot.place), `${state} is in ${spot.place}`);
-    assert(Number.isInteger(spot.floor), `${state} has no floor`);
+    // a state either names a room or falls to the leisure list — `idle` deliberately names none, because it
+    // chooses (café, gym or park), and an empty place for it would make that choice impossible
+    const homes = homesFor(state, 'probe');
+    assert(homes.length > 0, `${state} has nowhere to be`);
+    for (const home of homes) {
+      assert(['offices', 'roof', 'park', 'cafe', 'gym'].includes(home.place), `${state} is in ${home.place}`);
+      assert(Number.isInteger(home.floor), `${state} has no floor`);
+    }
   }
-  assert(Object.keys(STATE_ROOM).length === AGENTS.states.length, 'the table and the state list disagree');
+  assert(!STATE_ROOM.idle, 'idle has a room again: it would never choose');
 });
 
 check('an unknown state becomes idle and the list keeps its order', () => {
@@ -70,7 +77,7 @@ check('the static fallback is a real cast, not an empty street', () => {
   const snap = staticSnapshot();
   assert(snap.agents.length >= 2, `${snap.agents.length} fallback agents`);
   assert(snap.source === 'static', `the fallback says it comes from ${snap.source}`);
-  for (const agent of snap.agents) assert(STATE_ROOM[agent.state], `${agent.id} has no place to be`);
+  for (const agent of snap.agents) assert(homesFor(agent.state, agent.id).length > 0, `${agent.id} has nowhere to be`);
 });
 
 check('the same snapshot normalises to the same town, twice', () => {
@@ -97,7 +104,6 @@ check('a dead endpoint is a stale static cast, and fetchAgents never throws', as
 const raster = await import('./ground-check.mjs?stub').catch(() => null);
 void raster;
 const { streetLayout } = await import('../src/next/street.js');
-const { planCast, spotsOf, PREFERS } = await import('../src/next/cast.js');
 const STREET = streetLayout(960, 470, 399);
 const WORLD = { street: STREET, groundY: 399 };
 const snapshotOf = (agents) => normaliseSnapshot({ source: 'widget', agents });
@@ -132,6 +138,19 @@ check('a person walks facing the way they are going, and stands when they arrive
   assert(walker.facing === Math.sign(walker.npc.x - arrivalOf(walker.npc, WORLD).x), 'a person walks away from their spot');
   const arrived = walkers(plan3, WORLD, { clock: settleTime(plan3, WORLD) + 1, planAt: 0 })[0];
   assert(arrived.pose !== 'walk', `an arrived person is still in pose ${arrived.pose}`);
+});
+
+check('an idle or unknown agent chooses its own way to pass the time', () => {
+  const ids = ['pixel-town', 'olivella', 'botanic', 'gentle-ai', 'town', 'hola', 'otro', 'mas'];
+  const first = ids.map((id) => homesFor('idle', id)[0].place);
+  const distinct = new Set(first);
+  assert(distinct.size >= 2, `every idle agent chose the same place: ${[...distinct].join(', ')}`);
+  for (const id of ids) {
+    assert(homesFor('idle', id)[0].place === homesFor('idle', id)[0].place, 'the same agent changed its mind');
+    assert(homesFor('unknown', id)[0].place === homesFor('idle', id)[0].place, 'unknown does not choose like idle');
+    // and the fallback order still contains every leisure place, so a full café sends people to the gym
+    assert(new Set(homesFor('idle', id).map((h) => h.place)).size === LEISURE.length, 'a leisure place is missing from the fallback');
+  }
 });
 
 check('the cast walks the same way twice, and never off the street', () => {
@@ -180,14 +199,15 @@ check('one person per agent, each in the room its state names', () => {
   for (const npc of plan.cast) {
     // a state may have more than one home — an idle agent drinks coffee in the café until the six seats are
     // taken and only then sits on the park's bench — so the cast has to be in one of the homes it lists
-    const homes = PREFERS[npc.state] ?? [STATE_ROOM[npc.state]];
+    const homes = homesFor(npc.state, npc.id);
     const fits = homes.some((home) => home.place === npc.place && home.floor === npc.floor);
     assert(fits, `${npc.label} (${npc.state}) is in ${npc.place} F${npc.floor}, which is none of its homes`);
   }
   const smoker = plan.cast.find((n) => n.state === 'blocked');
   assert(smoker.place === 'roof', `blocked went to ${smoker.place}`);
   const idlers = plan.cast.filter((n) => n.state === 'idle');
-  assert(idlers.length > 0 && idlers.every((n) => n.place === 'cafe' || n.place === 'park'), 'idle went somewhere else');
+  const leisure = LEISURE.map((home) => home.place);
+  assert(idlers.length > 0 && idlers.every((n) => leisure.includes(n.place)), `idle went to ${idlers.map((n) => n.place).join(',')}`);
 });
 
 check('nobody sits on a seat somebody else is already on', () => {

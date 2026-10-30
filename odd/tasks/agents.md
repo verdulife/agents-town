@@ -141,3 +141,20 @@ los cuatro instantes que importan (andando, oculto, saliendo, llegando).
 Still owed by A4b, and it is T4: the lift's own animation — the doors opening and closing and the cabin moving
 between floors. Today the ride is honest (the person is out of sight and reappears on the right floor) but the
 lift does not move, so the journey is told by the person and not yet by the building.
+
+L7: a state with no room of its own now CHOOSES. `idle` and whatever the normaliser reduces to it (`unknown`, a
+state the bar does not report) pick between the **café, the gym and the park** — the first of the three is their
+own, chosen by `hashOf(id)`, so two idle agents do not follow each other around and one agent does not change its
+mind between two snapshots; the rest of the list is the fallback when the first is full. Measured: six idle/unknown
+agents land three in the café and three in the park with these ids, and a seventh would go to the gym before the
+café's standing room.
+
+`idle` therefore has **no room in `STATE_ROOM`** on purpose, and the check forbids putting one back: with a room,
+the leisure list would never be consulted. The states that name a room (working, planning, implementing,
+exploring, deciding, checking) keep exactly one home each.
+
+Verified: `agents:check` **17/17** — the new rule is that the choice is personal, stable, that `unknown` chooses
+like `idle`, and that the fallback order still contains every leisure place, so a full café sends people to the
+gym. Plus the two older rules adjusted to ask `homesFor` instead of the room table.
+
+Owed and unchanged: the lift's own art (T4) and the rooms' interactions (T5).

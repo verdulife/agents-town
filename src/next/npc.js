@@ -12,6 +12,7 @@
 import { officesLayout } from './offices.js';
 import { cafeLayout } from './cafe.js';
 import { AGENTS } from './agents.js';
+import { hashOf } from './cast.js';
 
 export const NPC = {
   speed: 18, // art px per second: a 217 px room takes twelve seconds to cross, which reads as a walk
@@ -118,17 +119,6 @@ export function walkerOf(npc, world, { clock, planAt, index = 0, journey = null 
   }
   // daylight: standing on the spot
   return { x: npc.x, y: npc.y, facing: 1, pose: NPC.seatPoses.includes(npc.kind) ? 'seat' : 'stand', phase: 0, moving: false, seated: NPC.seatPoses.includes(npc.kind), arrived: true, hidden: false, seed: hashOf(npc.id) % 7 };
-}
-
-// A stable small number per agent, so the same person always looks the same and two agents do not look alike by
-// accident. FNV-1a over the id, cut to the number of looks the sprite set offers.
-export function hashOf(id) {
-  let h = 2166136261;
-  for (const ch of String(id)) {
-    h ^= ch.charCodeAt(0);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
 }
 
 // The whole cast at one instant, ready to draw. `previous` is the cast before this one: whoever kept their id and

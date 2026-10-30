@@ -107,14 +107,36 @@ export function spotsOf({ street, groundY } = {}) {
   return spots;
 }
 
-// A state with more than one home. `idle` is the one that needs it: an idle agent drinks coffee in the café and,
-// when the six seats are taken, sits on the park's bench. The list is a preference, tried in order.
-export const PREFERS = {
-  idle: [
-    { place: 'cafe', floor: 0, room: null },
-    { place: 'park', floor: 0, room: 0 },
-  ],
-};
+// What a state with no room of its own does with its time. An idle (or unknown, which the normaliser already
+// reduces to idle) agent CHOOSES: it drinks coffee in the café, trains in the gym or sits on the park's bench —
+// and the choice is its own, so two idle agents do not follow each other around and one agent does not change
+// its mind between two snapshots. `hashOf(id)` picks the first home; the rest of the list is the fallback order
+// when that one is full.
+export const LEISURE = [
+  { place: 'cafe', floor: 0, room: null },
+  { place: 'gym', floor: 0, room: null },
+  { place: 'park', floor: 0, room: 0 },
+];
+
+// A stable small number per agent (FNV-1a over the id), so the same person always looks the same and always
+// chooses the same leisure place.
+export function hashOf(id) {
+  let h = 2166136261;
+  for (const ch of String(id)) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+// The homes a state tries, in order. A state that names a room has exactly one; a state that does not gets the
+// leisure list rotated by its own hash, so the choice is personal and reproducible.
+export function homesFor(state, id = '') {
+  const room = STATE_ROOM[state];
+  if (room) return [room];
+  const at = hashOf(id) % LEISURE.length;
+  return [...LEISURE.slice(at), ...LEISURE.slice(0, at)];
+}
 
 function orderOf(state) {
   const i = CAST.rank.indexOf(state);
@@ -131,8 +153,9 @@ export function planCast(snapshot, world) {
   const cast = [];
   const overflow = [];
   for (const agent of agents) {
-    // a state tries its homes in order: the café before the park for an idle agent, one room for the rest
-    const homes = PREFERS[agent.state] ?? [STATE_ROOM[agent.state] ?? STATE_ROOM.idle];
+    // a state tries its homes in order: one room when it names one, the leisure list — rotated by its own hash —
+    // when it does not (A3: unknown and idle choose between the café, the gym and the park)
+    const homes = homesFor(agent.state, agent.id);
     let room = homes[0];
     let mine = [];
     for (const home of homes) {

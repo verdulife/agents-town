@@ -31,7 +31,8 @@ export const STATE_ROOM = {
   // `checking` shares the working floor: a check happens where the work does (L5)
   checking: { place: 'offices', floor: 3, room: 0 },
   blocked: { place: 'roof', floor: 3, room: 0 },
-  idle: { place: 'park', floor: 0, room: 0 },
+  // `idle` has NO room on purpose: an idle agent chooses between the café, the gym and the park (see
+  // `homesFor` in cast.js), so giving it a room here would make that choice impossible.
 };
 
 const LABEL_MAX = 22;
